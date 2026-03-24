@@ -23,7 +23,7 @@ except ImportError:
 # 1. 全局配置区域
 # ==========================================
 # "Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"
-DATASET_LIST = ["Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"] 
+DATASET_LIST = ["Music"] 
 BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
 
 ALGO_LIST = ['ACORN-gamma', 'ACORN-improved', 'NaviX', 'UNG-nTfalse', 'pre-filter']
@@ -69,25 +69,31 @@ def create_classifier(model_type="RandomForest", **kwargs):
     else:
         raise ValueError(f"不支持的模型引擎: {model_type}")
 
-def label_best_algorithm(df, min_recall=0.90):
+def label_best_algorithm(df, min_recall=0.90, threshold=0.15):
     """
-    1.为数据集中的每一条查询打上满足召回率且耗时最短的最优算法标签。
+    1.'Time_ms'基于L2视角为数据集打上最优算法标签，并引入 Margin Threshold 过滤模糊样本。
     2.思路说明：
-      - 遍历数据集每一行，筛选出所有达到 min_recall 阈值的候选算法。
-      - 在达标的算法中，挑选真实搜索时间 (time) 最短的作为最优标签。
-      - 如果没有任何算法达标，则退而求其次，选择召回率最高的算法。
+      - 找出所有召回率达标的候选算法，并按纯搜索时间 (L2_Time_ms) 从快到慢排序。
+      - 提取第一名(最快)和第二名，计算性能差异百分比：(Time_2nd - Time_1st) / Time_1st。
+      - 如果差距小于 threshold，说明冠亚军难分伯仲，强制标记为 'Unknown' 以剔除该噪音样本。
     3.输入参数：
-      - df: pd.DataFrame，含义（必填，包含各算法召回率和时间统计的数据帧）
-      - min_recall: float，含义（可选，设定算法及格的最低召回率阈值，默认 0.90）
+      - df: pd.DataFrame，含义（必填，宽表数据）
+      - min_recall: float，含义（可选，最低召回率，默认 0.90）
+      - threshold: float，含义（可选，第一名必须比第二名快出的百分比，默认 0.15 即 15%）
     4.返回值类型和具体含义：
-      - pd.Series：返回与原数据集对齐的、由最优算法名称组成的标签序列。
+      - pd.Series：最优算法标签序列，模糊样本将变成 'Unknown'。
     """
     best_algos = []
+    
+    # 统计信息（用于打印观察）
+    fuzzy_count = 0 
+    
     for idx, row in df.iterrows():
         candidates = []
         for algo in ALGO_LIST:
             recall_col = f'Recall_{algo}'
-            time_col = f'true_search_time_ms_{algo}'
+            time_col = f'L2_Time_ms_{algo}' 
+            
             if recall_col in row and time_col in row and pd.notna(row[recall_col]) and pd.notna(row[time_col]):
                 candidates.append({'algo': algo, 'recall': row[recall_col], 'time': row[time_col]})
                 
@@ -96,9 +102,30 @@ def label_best_algorithm(df, min_recall=0.90):
             continue
             
         qualified = [c for c in candidates if c['recall'] >= min_recall]
-        best = min(qualified, key=lambda x: x['time']) if qualified else max(candidates, key=lambda x: x['recall'])
-        best_algos.append(best['algo'])
         
+        if not qualified:
+            # 如果没有及格的，选召回率最高的兜底
+            best = max(candidates, key=lambda x: x['recall'])
+            best_algos.append(best['algo'])
+        else:
+            # 按照耗时从小到大排序
+            qualified.sort(key=lambda x: x['time'])
+            best = qualified[0]
+            
+            # --- 核心：引入 PERCENTAGE_THRESHOLD 思想 ---
+            if len(qualified) > 1:
+                second_best = qualified[1]
+                time_diff_percent = (second_best['time'] - best['time']) / (best['time'] + 1e-9)
+                
+                # 如果第一名比第二名快的优势不到 threshold (比如 15%)，视为模糊样本
+                if time_diff_percent < threshold:
+                    best_algos.append('Unknown')
+                    fuzzy_count += 1
+                    continue
+                    
+            best_algos.append(best['algo'])
+            
+    print(f"  [Info] 阈值过滤 (Threshold={threshold*100}%): 共剔除 {fuzzy_count} 个冠亚军差距过小的模糊样本。")
     return pd.Series(best_algos, index=df.index)
 
 def generate_naive_features(df):
@@ -129,24 +156,34 @@ def generate_naive_features(df):
 
 def train_and_evaluate(X, y, target_map, model_type):
     """
-    1.在纯净数据集上训练指定的树模型并完成评估，同时导出供 ONNX 写入的真实标签映射表。
+    1.'Time_ms'在清理后的纯净数据集上训练指定的树模型并完成评估，同时自动过滤极少数类别以防拆分崩溃。
     2.思路说明：
-      - 过滤异常标签并按 80/20 划分纯净测试集。
-      - 妥协于 XGBoost 的强迫症，训练期允许其将标签平移为连续 ID（如 0, 1）。
-      - 训练完成后，通过字典将预测结果重新映射为绝对 ID 进行评估。
-      - 把真正的绝对标签集 real_classes 抛出，留给外部 ONNX 导出逻辑做底层 Hack。
+      - 过滤掉映射为异常值的标签。
+      - 统计各类别样本数，强制剔除样本数量少于 2 的极稀有类别，防止 stratify 分层拆分时触发 ValueError。
+      - 按照 80/20 划分训练集和测试集（带分层抽样）。
+      - 兼容 XGBoost 的连续 ID 强迫症，完成训练后还原真实绝对 ID 进行测试集指标评估。
     3.输入参数：
       - X: pd.DataFrame，含义（必填，模型训练的特征集）
       - y: pd.Series，含义（必填，目标路由算法标签）
       - target_map: dict，含义（必填，算法文本名称到整形绝对索引的字典映射）
-      - model_type: str，含义（必填，选用的模型算法引擎名称）
+      - model_type: str，含义（必填，选用的模型算法引擎名称，如 "RandomForest", "XGBoost"）
     4.返回值类型和具体含义：
-      - dict: 返回涵盖准确率、耗时、分类报告、混淆矩阵、模型实例以及 real_classes(绝对ID列表) 的综合字典。
+      - dict: 返回涵盖准确率、耗时、分类报告、混淆矩阵、特征重要性、模型实例以及绝对标签集的综合字典。
     """
     y_mapped = y.map(target_map)
     valid_mask = y_mapped.notna()
-    X_clean, y_clean = X[valid_mask], y_mapped[valid_mask].astype(int)
+    X_clean, y_clean = X[valid_mask].copy(), y_mapped[valid_mask].astype(int).copy()
     
+    # --- 核心修复：剔除极度稀有的类别，防止 stratify 崩溃 ---
+    class_counts = y_clean.value_counts()
+    if class_counts.min() < 2:
+        valid_classes = class_counts[class_counts >= 2].index
+        dropped_classes = class_counts[class_counts < 2].to_dict()
+        print(f"  [Warning] 剔除极稀有类别(样本<2，无法分层拆分): {dropped_classes}")
+        
+        safe_mask = y_clean.isin(valid_classes)
+        X_clean, y_clean = X_clean[safe_mask], y_clean[safe_mask]
+
     # 记录并处理 XGBoost 的强制连续标签要求
     if model_type == "XGBoost":
         unique_labels = sorted(y_clean.unique())
@@ -202,7 +239,7 @@ def train_and_evaluate(X, y, target_map, model_type):
         "pred_counts": y_pred_orig.value_counts(),
         "real_classes": real_classes  # 抛出供 ONNX 覆写使用
     }
-
+    
 def run_naive_ablation_study(X, y, target_map, best_model_type):
     """
     1.对保留的5个核心特征进行逐一消融实验，评估特征单体重要性。
@@ -337,7 +374,7 @@ def process_single_dataset(dataset_name):
     df = pd.read_csv(csv_path)
     total_queries = len(df)
     
-    df['Best_Algo'] = label_best_algorithm(df, min_recall=0.90)
+    df['Best_Algo'] = label_best_algorithm(df, min_recall=0.90, threshold=0.20)
     X_All = generate_naive_features(df)
     
     TARGET_MAP = {

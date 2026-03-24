@@ -5,33 +5,43 @@ import time
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier, _tree
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from imblearn.over_sampling import SMOTE
+import joblib
 
+# ONNX 导出库支持
 try:
     from skl2onnx import convert_sklearn
-    from skl2onnx.common.data_types import FloatTensorType
+    from skl2onnx.common.data_types import FloatTensorType as SklFloatTensorType
     SKL2ONNX_AVAILABLE = True
 except ImportError:
     SKL2ONNX_AVAILABLE = False
 
+try:
+    import onnxmltools
+    from onnxmltools.convert.common.data_types import FloatTensorType as OnnxFloatTensorType
+    ONNXMLTOOLS_AVAILABLE = True
+except ImportError:
+    ONNXMLTOOLS_AVAILABLE = False
+
 # ==========================================
 # 1. 全局配置区域
 # ==========================================
-DATASET_NAME = "BookReviews"  
+# 支持批量处理的数据集列表
+DATASET_LIST = ["Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"] 
 BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
-CSV_PATH = os.path.join(BASE_DIR, "EDA_Plots", DATASET_NAME, f"{DATASET_NAME}_aligned_results.csv")
-OUTPUT_DIR = os.path.join(BASE_DIR, DATASET_NAME, "SelectModels", "fast_smart_route")
 
 ALGO_LIST = ['ACORN-gamma', 'ACORN-improved', 'NaviX', 'UNG-nTfalse', 'UNG-nTtrue', 'pre-filter']
 ACORN_FAMILY = ['ACORN-gamma', 'ACORN-improved', 'NaviX']
 
-MIN_SAMPLES_RATIO = 0.025  
-CORE_MODEL_TYPE = "RandomForest"
+# 模型竞技场候选者
+MODELS_TO_TRY = ["RandomForest", "XGBoost"]
+
+# 模糊样本过滤阈值 (冠亚军耗时差异小于该值则丢弃该样本)
+MARGIN_THRESHOLD = 0.20 
 
 # ==========================================
-# 2. 核心功能与工厂函数
+# 2. 核心功能与特征工厂
 # ==========================================
 def create_classifier(model_type="RandomForest", **kwargs):
     if model_type == "RandomForest":
@@ -43,21 +53,31 @@ def create_classifier(model_type="RandomForest", **kwargs):
         params = {'max_depth': 6, 'learning_rate': 0.1, 'n_estimators': 100, 'random_state': 42, 'n_jobs': -1}
         params.update(kwargs)
         return xgb.XGBClassifier(**params)
-    elif model_type == "LightGBM":
-        import lightgbm as lgb
-        params = {'max_depth': 8, 'learning_rate': 0.1, 'n_estimators': 100, 'random_state': 42, 'n_jobs': -1, 'class_weight': 'balanced'}
-        params.update(kwargs)
-        return lgb.LGBMClassifier(**params)
     else:
         raise ValueError(f"不支持的模型类型: {model_type}")
 
-def label_best_algorithm(df, min_recall=0.90):
+def label_best_algorithm_by_time(df, time_prefix='L1_Time_ms', min_recall=0.90, threshold=0.15):
+    """
+    1.一句话概括函数核心作用：基于纯搜索时间为数据集打上最优算法标签，并引入 Margin Threshold 过滤模糊样本。
+    2.思路说明：
+      - 找出所有召回率达标的候选算法，并按耗时从快到慢排序。
+      - 提取第一名(最快)和第二名，计算性能差异百分比：(Time_2nd - Time_1st) / Time_1st。
+      - 如果差距小于 threshold，说明冠亚军难分伯仲，强制标记为 'Unknown' 以剔除该噪音样本。
+    3.输入参数：
+      - df: pd.DataFrame，含义（必填，宽表数据）
+      - time_prefix: str，含义（可选，时间度量前缀，如 L1_Time_ms 或 L2_Time_ms）
+      - min_recall: float，含义（可选，最低召回率，默认 0.90）
+      - threshold: float，含义（可选，第一名必须比第二名快出的百分比，默认 0.15）
+    4.返回值类型和具体含义：
+      - pd.Series：最优算法标签序列，模糊样本将被标记为 'Unknown'。
+    """
     best_algos = []
+    fuzzy_count = 0
     for idx, row in df.iterrows():
         candidates = []
         for algo in ALGO_LIST:
             recall_col = f'Recall_{algo}'
-            time_col = f'true_search_time_ms_{algo}'
+            time_col = f'{time_prefix}_{algo}'
             if recall_col in row and time_col in row and pd.notna(row[recall_col]) and pd.notna(row[time_col]):
                 candidates.append({'algo': algo, 'recall': row[recall_col], 'time': row[time_col]})
                 
@@ -66,380 +86,408 @@ def label_best_algorithm(df, min_recall=0.90):
             continue
             
         qualified = [c for c in candidates if c['recall'] >= min_recall]
-        best = min(qualified, key=lambda x: x['time']) if qualified else max(candidates, key=lambda x: x['recall'])
-        best_algos.append(best['algo'])
         
+        if not qualified:
+            best = max(candidates, key=lambda x: x['recall'])
+            best_algos.append(best['algo'])
+        else:
+            qualified.sort(key=lambda x: x['time'])
+            best = qualified[0]
+            
+            if len(qualified) > 1:
+                second_best = qualified[1]
+                time_diff_percent = (second_best['time'] - best['time']) / (best['time'] + 1e-9)
+                if time_diff_percent < threshold:
+                    best_algos.append('Unknown')
+                    fuzzy_count += 1
+                    continue
+                    
+            best_algos.append(best['algo'])
+            
+    print(f"  [Info] {time_prefix} 阈值过滤 (Threshold={threshold*100}%): 剔除 {fuzzy_count} 个模糊样本。")
     return pd.Series(best_algos, index=df.index)
 
 def generate_cascade_features(df):
-    # ==========================================
-    # L1 特征：QuerySize, ExactCandSize, CandSize, GlobalPpass 及其组合
-    # ==========================================
+    """
+    1.一句话概括函数核心作用：生成级联路由 L1 和 L2 所需的极简特征。
+    2.思路说明：
+      - L1 特征仅包含前置的 3 个基础特征：QuerySize, CandSize, GlobalPpass。
+      - L2 特征在 L1 基础上，追加算完 ELS 才会获得的 NumEntries 和 NumDescendants。
+    3.输入参数：
+      - df: pd.DataFrame，含义（必填，包含所有特征列的原始宽表）
+    4.返回值类型和具体含义：
+      - tuple(pd.DataFrame, pd.DataFrame)：返回清洗完毕的 X_L1 和 X_L2 两个特征集。
+    """
     X_L1 = pd.DataFrame(index=df.index)
-    
-    # 基础特征
     X_L1['QuerySize'] = df['QuerySize']
-    X_L1['ExactCandSize'] = df['ExactCandSize']
     X_L1['CandSize'] = df['CandSize']
     X_L1['GlobalPpass'] = df['GlobalPpass']
     
-    # 组合特征
-    X_L1['Log_ExactCandSize'] = np.log1p(df['ExactCandSize'])
-    X_L1['Log_CandSize'] = np.log1p(df['CandSize'])
-    X_L1['Cand_per_Query'] = df['ExactCandSize'] / (df['QuerySize'] + 1e-9)
-    X_L1['Ppass_x_Query'] = df['GlobalPpass'] * df['QuerySize']
-    X_L1['Exact_vs_Cand'] = df['ExactCandSize'] / (df['CandSize'] + 1e-9) # 过滤效率指标
-
-    # ==========================================
-    # L2 特征：L1全特征 + NumEntries, NumDescendants 及其组合
-    # ==========================================
-    X_L2 = X_L1.copy() # L2 继承 L1 的所有特征
-    
-    # 基础特征
+    X_L2 = X_L1.copy() 
     X_L2['NumEntries'] = df['NumEntries']
     X_L2['NumDescendants'] = df['NumDescendants']
     
-    # 追加 L2 独有组合特征
-    X_L2['Log_NumDescendants'] = np.log1p(df['NumDescendants'])
-    X_L2['Desc_per_Entry'] = df['NumDescendants'] / (df['NumEntries'] + 1e-9)
-    X_L2['Interaction_Desc_Ppass'] = df['NumDescendants'] * df['GlobalPpass']
-    X_L2['Desc_per_Global'] = df['NumDescendants'] / (df['GlobalPpass'] * len(df) + 1e-9) # 相对膨胀率
-    X_L2['Desc_vs_ExactCand'] = df['NumDescendants'] / (df['ExactCandSize'] + 1e-9) # 后代冗余度
-    X_L2['Entry_vs_QuerySize'] = df['NumEntries'] / (df['QuerySize'] + 1e-9)
-    
-    # 清理异常值
     X_L1.replace([np.inf, -np.inf], np.nan, inplace=True); X_L1.fillna(0, inplace=True)
     X_L2.replace([np.inf, -np.inf], np.nan, inplace=True); X_L2.fillna(0, inplace=True)
     
     return X_L1, X_L2
 
-def run_ablation_study(df):
-    """
-    针对各种特征族的消融实验。
-    自动将基础特征与其衍生组合特征一并切除，进行公平对比。
-    """
-    print("--- 正在运行特征消融实验 ---")
+def train_and_evaluate_model(X_train, y_train, X_test, y_test, target_map, model_type, use_smote=True):
+    # 1. 映射为目标字典中的绝对 ID
+    y_train_mapped = y_train.map(target_map)
+    y_test_mapped = y_test.map(target_map)
     
-    # 重新构建完整的 L2 特征作为完全体候选
-    _, X_abl = generate_cascade_features(df)
+    # 2. 剥离无法映射的脏数据 ('Unknown')
+    train_mask = y_train_mapped.notna()
+    X_train_clean = X_train[train_mask].copy()
+    y_train_clean = y_train_mapped[train_mask].astype(int)
     
-    valid_mask = df['Best_Algo'].notna() & (df['Best_Algo'] != 'Unknown')
-    X_clean = X_abl[valid_mask]
-    y_clean = df.loc[valid_mask, 'Best_Algo']
+    test_mask = y_test_mapped.notna()
+    X_test_clean = X_test[test_mask].copy()
+    y_test_clean = y_test_mapped[test_mask].astype(int) 
     
-    if len(X_clean) == 0:
-        return {}
+    # 3. 建立从 0 开始的连续隐式映射
+    train_unique = sorted(y_train_clean.unique())
+    remapping = {old_lbl: new_lbl for new_lbl, old_lbl in enumerate(train_unique)}
+    y_train_cont = y_train_clean.map(remapping).astype(int)
+    
+    internal_to_original = {new_lbl: old_lbl for old_lbl, new_lbl in remapping.items()}
+    real_classes = [internal_to_original[i] for i in range(len(internal_to_original))]
 
-    all_features = list(X_clean.columns)
-    
-    # 辅助函数：通过关键词屏蔽一组特征（含衍生特征）
-    def get_ablated_features(exclude_keywords):
-        return [f for f in all_features if not any(k in f for k in exclude_keywords)]
-
-    configs = {
-        "完全体 (All L2 Features)": all_features,
-        "消融: 移除 NumEntries 族": get_ablated_features(["NumEntries", "Entry"]),
-        "消融: 移除 NumDescendants 族": get_ablated_features(["NumDescendants", "Desc"]),
-        "消融: 移除 GlobalPpass 族": get_ablated_features(["GlobalPpass", "Ppass", "Global"]),
-        "极端消融: 仅用 L1 特征 (无图导航)": get_ablated_features(["NumEntries", "Entry", "NumDescendants", "Desc"])
-    }
-    
-    results = {}
-    for config_name, feat_cols in configs.items():
-        X_curr = X_clean[feat_cols]
-        X_train, X_test, y_train, y_test = train_test_split(X_curr, y_clean, test_size=0.2, random_state=42, stratify=y_clean)
-        
-        clf = create_classifier(model_type=CORE_MODEL_TYPE)
-        clf.fit(X_train, y_train)
-        acc = accuracy_score(y_test, clf.predict(X_test))
-        results[config_name] = acc
-        
-    return results
-
-def extract_cpp_rules_from_tree(tree_model, feature_names, class_names):
-    tree_ = tree_model.tree_
-    feature_name = [
-        feature_names[i] if i != _tree.TREE_UNDEFINED else "undefined!"
-        for i in tree_.feature
-    ]
-
-    def recurse(node, depth):
-        indent = "    " * depth
-        if tree_.feature[node] != _tree.TREE_UNDEFINED:
-            name = feature_name[node]
-            threshold = tree_.threshold[node]
-            cpp_code = f"{indent}if ({name} <= {threshold:.4f}) {{\n"
-            cpp_code += recurse(tree_.children_left[node], depth + 1)
-            cpp_code += f"{indent}}} else {{\n"
-            cpp_code += recurse(tree_.children_right[node], depth + 1)
-            cpp_code += f"{indent}}}\n"
-            return cpp_code
-        else:
-            class_idx = np.argmax(tree_.value[node][0])
-            try:
-                real_cls = class_names[class_idx]
-            except ValueError:
-                real_cls = str(class_idx)
-            return f"{indent}return {real_cls};\n"
-
-    return recurse(0, 2)
-
-def train_and_evaluate_model(X, y, target_map, model_name, output_dir, use_smote=True):
-    y_mapped = y.map(target_map)
-    valid_mask = y_mapped.notna()
-    X_clean, y_clean = X[valid_mask], y_mapped[valid_mask].astype(int)
-    
-    if CORE_MODEL_TYPE == "XGBoost":
-        unique_labels = sorted(y_clean.unique())
-        remapping = {old_lbl: new_lbl for new_lbl, old_lbl in enumerate(unique_labels)}
-        y_clean = y_clean.map(remapping)
-        internal_to_original = {new_lbl: old_lbl for old_lbl, new_lbl in remapping.items()}
-    else:
-        internal_to_original = {lbl: lbl for lbl in y_clean.unique()}
-
-    X_train, X_test, y_train, y_test = train_test_split(X_clean, y_clean, test_size=0.2, random_state=42, stratify=y_clean)
-    
-    train_size_orig = len(X_train)
-    
+    # 4. SMOTE 平衡
+    train_size_orig = len(X_train_clean)
     if use_smote:
         try:
-            min_samples = y_train.value_counts().min()
+            min_samples = y_train_cont.value_counts().min()
             safe_k = min(5, min_samples - 1) if min_samples > 1 else 1
             if min_samples > 1:
                 smote = SMOTE(random_state=42, k_neighbors=safe_k)
-                X_train, y_train = smote.fit_resample(X_train, y_train)
+                X_train_clean, y_train_cont = smote.fit_resample(X_train_clean, y_train_cont)
         except Exception:
             pass
 
-    classifier = create_classifier(model_type=CORE_MODEL_TYPE)
-    
+    X_train_np = X_train_clean.values
+    y_train_np = y_train_cont.values
+    X_test_np = X_test_clean.values
+
+    # 5. 模型训练
+    classifier = create_classifier(model_type=model_type)
     start_time = time.perf_counter()
-    classifier.fit(X_train, y_train)
+    classifier.fit(X_train_np, y_train_np)
     duration_ms = (time.perf_counter() - start_time) * 1000.0
     
-    y_pred = classifier.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
+    # 6. 预测并还原为绝对 ID 以计算真实准确率
+    y_pred_np = classifier.predict(X_test_np)
+    y_pred_abs = np.array([real_classes[int(idx)] for idx in y_pred_np])
+    y_test_abs = y_test_clean.values 
     
-    y_test_orig = y_test.map(internal_to_original)
-    y_pred_orig = pd.Series(y_pred).map(internal_to_original)
+    acc = accuracy_score(y_test_abs, y_pred_abs)
     
     inv_map = {v: k for k, v in target_map.items()}
-    present_labels = sorted(y_test_orig.unique())
+    present_labels = sorted(np.unique(np.concatenate((y_test_abs, y_pred_abs))))
     target_names = [inv_map[l] for l in present_labels]
     
-    report_str  = f"  ▶ 底层引擎     : {CORE_MODEL_TYPE}\n"
-    smote_status = f" (SMOTE后 {len(X_train)} 条)" if use_smote else " (未启用SMOTE)"
-    report_str += f"  ▶ 数据分布     : 训练集 {train_size_orig} 条{smote_status} | 测试集 {len(X_test)} 条\n"
+    report_str  = f"  ▶ 底层引擎     : {model_type}\n"
+    smote_status = f" (SMOTE后 {len(X_train_np)} 条)" if use_smote else " (未启用SMOTE)"
+    report_str += f"  ▶ 数据分布     : 训练集 {train_size_orig} 条{smote_status} | 测试集 {len(X_test_np)} 条\n"
     report_str += f"  ▶ 拟合耗时     : {duration_ms:.2f} ms\n"
     report_str += f"  ▶ 测试集准确率 : {acc:.4%}\n\n"
     
     report_str += "  [核心指标 (Classification Report)]\n"
-    cls_report = classification_report(y_test_orig, y_pred_orig, labels=present_labels, target_names=target_names, zero_division=0)
+    cls_report = classification_report(y_test_abs, y_pred_abs, labels=present_labels, target_names=target_names, zero_division=0)
     report_str += "  " + cls_report.replace('\n', '\n  ') + "\n"
     
-    cm = confusion_matrix(y_test_orig, y_pred_orig, labels=present_labels)
+    cm = confusion_matrix(y_test_abs, y_pred_abs, labels=present_labels)
     cm_df = pd.DataFrame(cm, index=[f"True_{name}" for name in target_names], columns=[f"Pred_{name}" for name in target_names])
     report_str += "  [混淆矩阵 (Confusion Matrix)]\n"
-    report_str += "  " + cm_df.to_string().replace('\n', '\n  ') + "\n"
-    
-    if SKL2ONNX_AVAILABLE and CORE_MODEL_TYPE == "RandomForest":
-        onnx_filename = os.path.join(output_dir, f"{model_name}.onnx")
-        initial_type = [('float_input', FloatTensorType([None, X.shape[1]]))]
-        onnx_model = convert_sklearn(classifier, initial_types=initial_type, target_opset=15)
-        with open(onnx_filename, "wb") as f:
-            f.write(onnx_model.SerializeToString())
-            
+    report_str += "  " + cm_df.to_string().replace('\n', '\n  ') + "\n\n"
+
     if hasattr(classifier, 'feature_importances_'):
-        importance_df = pd.DataFrame({'Feature': X.columns, 'Importance': classifier.feature_importances_})
+        importance_df = pd.DataFrame({'Feature': X_train.columns, 'Importance': classifier.feature_importances_})
         importance_df = importance_df.sort_values(by='Importance', ascending=False).reset_index(drop=True)
         importance_str = importance_df.to_string(formatters={'Importance': '{:.4f}'.format})
     else:
-        importance_str = "当前模型引擎不支持直接提取 Feature Importances。"
+        importance_str = "当前模型不支持提取 Feature Importances。"
         
-    return report_str, importance_str, duration_ms, classifier
+    return {
+        "report_str": report_str,
+        "importance_str": importance_str,
+        "duration_ms": duration_ms,
+        "classifier": classifier,
+        "acc": acc,
+        "real_classes": real_classes
+    }
+
+def save_onnx_model(classifier, model_type, num_features, output_dir, filename, real_classes=None):
+    onnx_filename = os.path.join(output_dir, filename)
+    try:
+        if model_type == "RandomForest" and SKL2ONNX_AVAILABLE:
+            initial_type = [('float_input', SklFloatTensorType([None, num_features]))]
+            onnx_model = convert_sklearn(classifier, initial_types=initial_type, target_opset=15)
+        elif model_type == "XGBoost" and ONNXMLTOOLS_AVAILABLE:
+            initial_type = [('float_input', OnnxFloatTensorType([None, num_features]))]
+            import onnxmltools
+            onnx_model = onnxmltools.convert_xgboost(classifier, initial_types=initial_type, target_opset=15)
+        else:
+            print(f"⚠️ 无法导出 {model_type} 的 ONNX 模型。")
+            return
+            
+        with open(onnx_filename, "wb") as f:
+            f.write(onnx_model.SerializeToString())
+            
+        if real_classes is not None:
+            import onnx
+            model = onnx.load(onnx_filename)
+            patched = False
+            for node in model.graph.node:
+                for attr in node.attribute:
+                    if attr.name == 'classlabels_int64s':
+                        del attr.ints[:]
+                        attr.ints.extend(real_classes)
+                        patched = True
+            if patched:
+                onnx.save(model, onnx_filename)
+                print(f"🔧 [ONNX Hack] 成功将 {filename} 底层节点硬编码为绝对映射 ID: {real_classes}")
+    except Exception as e:
+        print(f"❌ 导出 ONNX 模型时发生错误: {e}")
+
+def calculate_cascade_system_accuracy(X_L1_test, X_L2_test, y_global_best_test, 
+                                      l1_clf, l1_real_classes, L1_MAP,
+                                      els_clf,
+                                      l2_clf, l2_real_classes, L2_MAP,
+                                      majority_acorn_algo):
+    """
+    1.一句话概括函数核心作用：模拟 C++ 端的真实推演路径，计算级联架构的端到端最终准确率。
+    2.思路说明：
+      - 第一层：使用 l1_clf 拦截 ACORN 和 pre-filter 分支。
+      - ELS层：如果 L1 预测为 'NEED_ELS'，则调用预先训练好的 intelELS 模型 (els_clf) 裁定 nTtrue 或 nTfalse。
+      - 第二层：调用 l2_clf 进行复判。若 L2 判定使用 UNG_Family，则最终输出为 ELS 层的裁定结果。
+    3.输入参数：
+      - X_L1_test / X_L2_test: pd.DataFrame，含义（必填，L1和L2特征测试集）
+      - y_global_best_test: pd.Series，含义（必填，测试集的真实全局最优标签）
+      - l1_clf / l2_clf: Classifier，含义（必填，训练好的随机森林对象）
+      - els_clf: Classifier，含义（必填，加载自 intelElS 的 ELS 路由模型对象）
+      - majority_acorn_algo: str，含义（必填，用于 L1 阶段的 ACORN 多数派短路兜底）
+    4.返回值类型和具体含义：
+      - tuple(float, list)：返回系统整体 Accuracy 和具体的预测列表。
+    """
+    inv_L1 = {v: k for k, v in L1_MAP.items()}
+    inv_L2 = {v: k for k, v in L2_MAP.items()}
+    
+    preds_l1_raw = l1_clf.predict(X_L1_test.values)
+    preds_l1_mapped = [l1_real_classes[int(idx)] for idx in preds_l1_raw]
+    
+    final_preds = []
+    for i, l1_mapped_idx in enumerate(preds_l1_mapped):
+        l1_decision = inv_L1[l1_mapped_idx]
+        
+        # --- 1. L1 极速放行 ---
+        if l1_decision == 'pre-filter':
+            final_preds.append('pre-filter')
+        elif l1_decision == 'ACORN_Family':
+            final_preds.append(majority_acorn_algo) 
+        else: 
+            # --- 2. 走到这里的都需要计算 ELS，我们先模拟 ELS 模型做决定 ---
+            els_decision = 'UNG-nTfalse' # 默认保守分支
+            if els_clf is not None:
+                # 极简版 ELS 模型的 3 个特征正好与 L1 完全重合！
+                els_features = X_L1_test.iloc[[i]].values 
+                els_pred = els_clf.predict(els_features)[0]
+                els_decision = 'UNG-nTtrue' if els_pred == 1 else 'UNG-nTfalse'
+                
+            # --- 3. 将 L2 特征喂给 L2 裁判长 ---
+            row_features = X_L2_test.iloc[[i]].values
+            pred_l2_raw = l2_clf.predict(row_features)[0]
+            pred_l2_mapped = l2_real_classes[int(pred_l2_raw)]
+            l2_decision = inv_L2[pred_l2_mapped]
+            
+            # 若 L2 确认使用 UNG 家族，则输出 ELS 的裁定；否则听 L2 (如反悔改判 ACORN-gamma)
+            if l2_decision == 'UNG_Family':
+                final_preds.append(els_decision)
+            else:
+                final_preds.append(l2_decision)
+            
+    # 只针对 Global Best 不是 Unknown 的样本计算准确率
+    valid_mask = y_global_best_test != 'Unknown'
+    y_true_valid = y_global_best_test[valid_mask]
+    final_preds_valid = [final_preds[j] for j, valid in enumerate(valid_mask) if valid]
+    
+    acc = accuracy_score(y_true_valid, final_preds_valid)
+    return acc, final_preds
 
 # ==========================================
-# 3. 主干执行流
+# 3. 单一数据集处理总线
 # ==========================================
-def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    report_path = os.path.join(OUTPUT_DIR, f"SmartRoute_Cascade_Report_{DATASET_NAME}.txt")
+def process_single_dataset(dataset_name):
+    print(f"\n{'='*70}")
+    print(f"🚀 开始处理双层路由数据集: {dataset_name}")
+    print(f"{'='*70}")
     
-    if not os.path.exists(CSV_PATH):
-        print(f"❌ 找不到数据文件: {CSV_PATH}")
+    csv_path = os.path.join(BASE_DIR, "EDA_Plots", dataset_name, f"{dataset_name}_aligned_results.csv")
+    output_dir = os.path.join(BASE_DIR, dataset_name, "SelectModels", "fast_smart_route")
+    os.makedirs(output_dir, exist_ok=True)
+    report_path = os.path.join(output_dir, f"FastSmartRoute_Cascade_Report_{dataset_name}.txt")
+    
+    if not os.path.exists(csv_path):
+        print(f"❌ 找不到数据文件: {csv_path}，跳过。")
         return
         
-    df = pd.read_csv(CSV_PATH)
-    total_queries = len(df)
+    df = pd.read_csv(csv_path)
     
-    df['Best_Algo'] = label_best_algorithm(df, min_recall=0.90)
+    # 核心：带 15% 容忍度的打标过滤
+    df['Global_Best'] = label_best_algorithm_by_time(df, time_prefix='L1_Time_ms', min_recall=0.90, threshold=MARGIN_THRESHOLD)
+    df['L2_Best'] = label_best_algorithm_by_time(df, time_prefix='L2_Time_ms', min_recall=0.90, threshold=MARGIN_THRESHOLD)
     
-    # 运行消融实验
-    ablation_results = run_ablation_study(df)
+    # 组装 L1 和 L2 的目标标签
+    df['L1_Target'] = df['Global_Best'].replace({a: 'ACORN_Family' for a in ACORN_FAMILY})
+    df['L1_Target'] = df['L1_Target'].replace({'UNG-nTfalse': 'NEED_ELS', 'UNG-nTtrue': 'NEED_ELS'})
+    
+    df['L2_Target'] = df['L2_Best'].replace({'UNG-nTfalse': 'UNG_Family', 'UNG-nTtrue': 'UNG_Family'})
     
     X_L1, X_L2 = generate_cascade_features(df)
     
-    acorn_mask = df['Best_Algo'].isin(ACORN_FAMILY)
-    acorn_count = acorn_mask.sum()
-    acorn_ratio = acorn_count / total_queries
-    use_l1_5_model = acorn_ratio >= MIN_SAMPLES_RATIO
+    valid_mask = (df['Global_Best'] != 'Unknown') & (df['L2_Best'] != 'Unknown')
+    valid_indices = df[valid_mask].index
     
-    ung_mask = df['Best_Algo'].str.startswith('UNG')
-    optimal_l2_inflow_rate = ung_mask.sum() / total_queries
+    train_idx, test_idx = train_test_split(valid_indices, test_size=0.2, random_state=42)
     
-    cpp_deployment_code = ""
-    l1_5_duration_ms = 0.0
-    l1_5_acc = 0.0
-    l1_5_status_msg = ""
+    X_L1_train, X_L1_test = X_L1.loc[train_idx], X_L1.loc[test_idx]
+    X_L2_train, X_L2_test = X_L2.loc[train_idx], X_L2.loc[test_idx]
+    
+    y_L1_train, y_L1_test = df.loc[train_idx, 'L1_Target'], df.loc[test_idx, 'L1_Target']
+    y_L2_train, y_L2_test = df.loc[train_idx, 'L2_Target'], df.loc[test_idx, 'L2_Target']
+    y_Global_Best_test = df.loc[test_idx, 'Global_Best']
 
-    # --- Step 1: 动态 L1.5 专家模型 ---
-    if use_l1_5_model:
-        X_L1_5 = X_L1[acorn_mask]
-        y_L1_5 = df.loc[acorn_mask, 'Best_Algo']
-        
-        l1_5_classes = y_L1_5.unique().tolist()
-        class_map = {cls: idx for idx, cls in enumerate(l1_5_classes)}
-        y_L1_5_mapped = y_L1_5.map(class_map)
-        
-        dt_expert = DecisionTreeClassifier(max_depth=3, random_state=42, class_weight='balanced')
-        
-        t_start = time.perf_counter()
-        dt_expert.fit(X_L1_5, y_L1_5_mapped)
-        l1_5_duration_ms = (time.perf_counter() - t_start) * 1000.0
-        
-        y_l1_5_pred = dt_expert.predict(X_L1_5)
-        l1_5_acc = accuracy_score(y_L1_5_mapped, y_l1_5_pred)
-        
-        if l1_5_acc < 0.60:
-            majority_algo = y_L1_5.value_counts().index[0]
-            l1_5_status_msg = f"已触发智能熔断！准确率仅为 {l1_5_acc:.2%}，不可分。采用直接映射至 majority class: {majority_algo}。"
-            cpp_deployment_code = (
-                "  if (l1_res == 1) {\n"
-                f"      // [L1 极速拦截]: 命中 ACORN_Family，L1.5 已熔断，直接走 {majority_algo}\n"
-                f"      return {majority_algo};\n"
-                "  }\n"
-            )
-        else:
-            l1_5_status_msg = f"正常生成。反映嵌套 if-else 分支的纯度与可靠性。"
-            cpp_rules = extract_cpp_rules_from_tree(dt_expert, X_L1_5.columns, l1_5_classes)
-            cpp_deployment_code = (
-                "  if (l1_res == 1) {\n"
-                "      // [L1 极速拦截]: 命中 ACORN_Family，进入 L1.5 微路由规则\n"
-                f"{cpp_rules}"
-                "  }\n"
-            )
+    # ==================================
+    # 阶段零：加载 ELS Router 模型
+    # ==================================
+    els_model_path = os.path.join(BASE_DIR, dataset_name, "SelectModels", "intelElS", "idea1_selector_model_final.joblib")
+    els_clf = None
+    if os.path.exists(els_model_path):
+        print(f"\n[ELS 模型集成] 成功加载 ELS Router: {els_model_path}")
+        els_clf = joblib.load(els_model_path)
     else:
-        cpp_deployment_code = (
-            "  if (l1_res == 1) {\n"
-            "      // [L1 极速拦截]: 命中 ACORN_Family，样本过少，采用默认硬规则兜底\n"
-            "      return ACORN-gamma;\n"
-            "  }\n"
-        )
-    
-    # --- Step 2: Layer 1 ---
-    df_l1_target = df['Best_Algo'].replace({a: 'ACORN_Family' for a in ACORN_FAMILY})
-    df_l1_target = df_l1_target.replace({'UNG-nTfalse': 'NEED_ELS', 'UNG-nTtrue': 'NEED_ELS'})
-    
+        print("\n[ELS 模型集成] ⚠️ 未找到 ELS 模型，级联评估时 UNG 将默认走 nTfalse。")
+
+    # ==================================
+    # 阶段一: Layer 1 自动竞技场
+    # ==================================
+    print("\n[Layer 1 拦截网关 - 模型竞技场]")
     L1_TARGET_MAP = {'NEED_ELS': 0, 'ACORN_Family': 1, 'pre-filter': 2}
-    report_l1, imp_l1, l1_duration_ms, l1_clf = train_and_evaluate_model(X_L1, df_l1_target, L1_TARGET_MAP, "smart_route_L1_router", OUTPUT_DIR, use_smote=True)
+    best_l1_acc, best_l1_model, best_l1_res = -1, "", None
     
-    y_pred_all_l1 = l1_clf.predict(X_L1)
-    leak_count = np.sum(y_pred_all_l1 == 0)
-    leak_ratio = leak_count / total_queries
+    for model_type in MODELS_TO_TRY:
+        try:
+            res = train_and_evaluate_model(X_L1_train, y_L1_train, X_L1_test, y_L1_test, L1_TARGET_MAP, model_type, use_smote=True)
+            print(f"  > {model_type:<15} | 准确率: {res['acc']:.4%} | 耗时: {res['duration_ms']:.2f} ms")
+            if res['acc'] > best_l1_acc:
+                best_l1_acc = res['acc']
+                best_l1_model = model_type
+                best_l1_res = res
+        except Exception as e:
+            print(f"  > ⚠️ {model_type} 训练失败: {e}")
+            
+    print(f"🏆 L1 胜出模型: {best_l1_model} (Acc: {best_l1_acc:.4%})")
+    save_onnx_model(best_l1_res['classifier'], best_l1_model, X_L1_train.shape[1], output_dir, "l1_router.onnx", best_l1_res['real_classes'])
+
+    preds_l1_raw = best_l1_res['classifier'].predict(X_L1.loc[valid_indices].values)
+    preds_l1_mapped = [best_l1_res['real_classes'][int(idx)] for idx in preds_l1_raw]
+    leak_count = np.sum(np.array(preds_l1_mapped) == 0) # 0 is NEED_ELS
+    optimal_l2_inflow_rate = (df.loc[valid_indices, 'L1_Target'] == 'NEED_ELS').sum() / len(valid_indices)
+
+    # --- Layer 1.5 极简策略 (直接选取多数派算法) ---
+    acorn_mask_train = df.loc[train_idx, 'L1_Target'] == 'ACORN_Family'
+    if acorn_mask_train.sum() > 0:
+        majority_acorn_algo = df.loc[train_idx][acorn_mask_train]['Global_Best'].mode()[0]
+    else:
+        majority_acorn_algo = 'ACORN-gamma' # 默认兜底
+    print(f"\n[Layer 1.5 极简策略] 选定 ACORN 家族多数派为: {majority_acorn_algo}")
     
-    # --- Step 3: Layer 2 ---
+    # ==================================
+    # 阶段二: Layer 2 自动竞技场
+    # ==================================
+    print("\n[Layer 2 裁判层 - 模型竞技场]")
+    # L2 模型的目标中，UNG 统称为 UNG_Family，内部决策交给 ELS
     L2_TARGET_MAP = {
-        'UNG-nTfalse': 0, 'UNG-nTtrue': 1, 'ACORN-gamma': 2, 
-        'ACORN-improved': 3, 'NaviX': 4, 'pre-filter': 5
+        'UNG_Family': 0, 'ACORN-gamma': 1, 
+        'ACORN-improved': 2, 'NaviX': 3, 'pre-filter': 4
     }
+    best_l2_acc, best_l2_model, best_l2_res = -1, "", None
     
-    report_l2, imp_l2, l2_duration_ms, l2_clf = train_and_evaluate_model(X_L2, df['Best_Algo'], L2_TARGET_MAP, "smart_route_L2_router", OUTPUT_DIR, use_smote=False)
+    for model_type in MODELS_TO_TRY:
+        try:
+            res = train_and_evaluate_model(X_L2_train, y_L2_train, X_L2_test, y_L2_test, L2_TARGET_MAP, model_type, use_smote=False)
+            print(f"  > {model_type:<15} | 准确率: {res['acc']:.4%} | 耗时: {res['duration_ms']:.2f} ms")
+            if res['acc'] > best_l2_acc:
+                best_l2_acc = res['acc']
+                best_l2_model = model_type
+                best_l2_res = res
+        except Exception as e:
+            print(f"  > ⚠️ {model_type} 训练失败: {e}")
+
+    print(f"🏆 L2 胜出模型: {best_l2_model} (Acc: {best_l2_acc:.4%})")
+    save_onnx_model(best_l2_res['classifier'], best_l2_model, X_L2_train.shape[1], output_dir, "l2_router.onnx", best_l2_res['real_classes'])
+
+    # ==================================
+    # 阶段三: 系统级端到端推演
+    # ==================================
+    system_acc, _ = calculate_cascade_system_accuracy(
+        X_L1_test, X_L2_test, y_Global_Best_test, 
+        best_l1_res['classifier'], best_l1_res['real_classes'], L1_TARGET_MAP,
+        els_clf,
+        best_l2_res['classifier'], best_l2_res['real_classes'], L2_TARGET_MAP,
+        majority_acorn_algo
+    )
+    print(f"\n🚀 【最终战报】系统级端到端准确率: {system_acc:.4%}")
 
     # ==========================================
-    # 终极详尽报告生成
+    # 生成最终战报文本
     # ==========================================
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
         f.write("┃                           FastSmartRoute                           ┃\n")
         f.write("┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n")
-        f.write(f"┃ 基座模型: {CORE_MODEL_TYPE:<16}  数据集: {DATASET_NAME:<15}            ┃\n")
-        f.write(f"┃ 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S'):<40} ┃\n")
+        f.write(f"┃ 混合基座: L1({best_l1_model}) / L2({best_l2_model})\n")
+        f.write(f"┃ 数据集  : {dataset_name:<15} 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S'):<20} ┃\n")
         f.write("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n")
         
-        f.write("【壹 | 原始数据算法支配域分布 (Ground Truth)】\n")
+        f.write("【★核心总结 | 系统端到端架构表现 (End-to-End System Evaluation)】\n")
         f.write("-" * 70 + "\n")
-        for algo, count in df['Best_Algo'].value_counts().items():
-            f.write(f"  > {algo:<18} : {count:>5} 次 ({count/total_queries:>6.2%})\n")
+        f.write(f"  ▶ Margin 阈值过滤       : < {MARGIN_THRESHOLD*100}%\n")
+        f.write(f"  ▶ 模拟全流水线分发准确率: {system_acc:.4%}\n")
+        f.write(f"    (基于独立 Test 集，流经 L1 -> L1.5(多数派) -> ELS -> L2，与全局最优对比)\n\n")
+        
+        f.write("【壹 | 原始数据算法全局支配域分布 (Global Absolute Best)】\n")
+        f.write("-" * 70 + "\n")
+        for algo, count in df.loc[valid_indices, 'Global_Best'].value_counts().items():
+            f.write(f"  > {algo:<18} : {count:>5} 次 ({count/len(valid_indices):>6.2%})\n")
         f.write("\n")
         
-        # 新增：消融实验板块
-        if ablation_results:
-            base_acc = ablation_results.get("完全体 (All L2 Features)", 0)
-            f.write("【贰 | 特征消融实验评估 (Ablation Study on Graph Routing Features)】\n")
-            f.write("-" * 70 + "\n")
-            f.write("  [实验目的] 在直接预测全域 6 种算法的最佳配置时，评测核心图特征族及其衍生特征的消融衰减。\n\n")
-            f.write(f"  {'配置方案':<40} | {'预测准确率':<12} | {'性能衰减':<12}\n")
-            f.write("  " + "-" * 70 + "\n")
-            for config, acc in ablation_results.items():
-                drop = base_acc - acc
-                drop_str = f"↓ {drop:.2%}" if drop > 0 else "-"
-                if config == "完全体 (All L2 Features)":
-                    drop_str = "Baseline"
-                f.write(f"  {config:<40} | {acc:>10.2%}   | {drop_str:>10}\n")
-            f.write("\n")
-        
-        if use_l1_5_model:
-            f.write("【附 | L1.5 专家树 (C++ 硬规则) 训练详情】\n")
-            f.write("-" * 70 + "\n")
-            f.write(f"  ▶ 拟合耗时 : {l1_5_duration_ms:.2f} ms\n")
-            f.write(f"  ▶ 规则准确率 : {l1_5_acc:.4%} ({l1_5_status_msg})\n\n")
-            
-        f.write("【叁 | Layer 1 (极速先验拦截网关) 解析】\n")
+        f.write("【贰 | Layer 1 (极速先验拦截网关) 解析】\n")
         f.write("-" * 70 + "\n")
-        f.write(f"  [特征池] 严格限定为 QuerySize, ExactCandSize, CandSize, GlobalPpass 及其衍生组合。\n")
-        f.write(f"  [输出映射] {L1_TARGET_MAP}\n")
-        f.write(f"  ▶▶ L2 拓扑分发率 : 本次共有 {leak_count} 次 ({leak_ratio:.2%}) 触发代价惩罚进入 L2 计算。\n")
-        f.write(f"                     (理论最优值: {optimal_l2_inflow_rate:.2%}，即真实需要 UNG 图的比例)\n\n")
-        
-        f.write(report_l1 + "\n")
+        f.write(f"  [特征池] 极简基础 3 特征: QuerySize, CandSize, GlobalPpass\n")
+        f.write(f"  [输出目标] {L1_TARGET_MAP}\n")
+        f.write(f"  ▶▶ L2 拓扑计算触发率 : {leak_count} 次 ({leak_count/len(valid_indices):.2%})\n")
+        f.write(f"     (理论极限界值: {optimal_l2_inflow_rate:.2%}，即真实需要计算 ELS 的比例)\n")
+        f.write(f"  ▶▶ ACORN 兜底策略 : {majority_acorn_algo} (L1预测为ACORN家族时直接选中)\n\n")
+        f.write(best_l1_res['report_str'] + "\n")
         f.write("  [特征重要性权重]\n")
-        f.write("  " + imp_l1.replace('\n', '\n  ') + "\n\n")
+        f.write("  " + best_l1_res['importance_str'].replace('\n', '\n  ') + "\n\n")
         
-        f.write("【肆 | Layer 2 (全视野兜底裁判层) 解析】\n")
+        f.write("【叁 | Layer 2 (全视野兜底裁判层) 解析】\n")
         f.write("-" * 70 + "\n")
-        f.write(f"  [特征池] 包含 L1 全集，并追加 NumEntries, NumDescendants 及其跨界衍生组合。\n")
-        f.write(f"  [输出映射] {L2_TARGET_MAP}\n")
-        f.write(f"  [防幻觉策略] 已为该层强制关闭 SMOTE，防止在极端小样本上产生决策幻觉。\n\n")
-        f.write(report_l2 + "\n")
+        f.write(f"  [特征池] 基础 3 特征 + 图结构 2 特征: NumEntries, NumDescendants\n")
+        f.write(f"  [输出目标] {L2_TARGET_MAP}\n")
+        f.write(f"  [内部机制] 若预测为 UNG_Family，则结果交由 ELS Router 接管裁定。\n\n")
+        f.write(best_l2_res['report_str'] + "\n")
         f.write("  [特征重要性权重]\n")
-        f.write("  " + imp_l2.replace('\n', '\n  ') + "\n\n")
+        f.write("  " + best_l2_res['importance_str'].replace('\n', '\n  ') + "\n\n")
         
-        f.write("【伍 | C++ code (Deployment Logic)】\n")
-        f.write("-" * 70 + "\n")
-        f.write("  // Step 1: 获取 O(1) 维度的 Layer 1 特征\n")
-        f.write("  int l1_res = L1_Model.predict(L1_Features);\n\n")
-        f.write(cpp_deployment_code)
-        f.write("  else if (l1_res == 2) {\n")
-        f.write("      // [L1 极速拦截]: 命中 pre-filter\n")
-        f.write("      return pre-filter;\n  }\n")
-        f.write("  else { \n")
-        f.write("      // [L1 无法决断]: l1_res == 0 (NEED_ELS)\n")
-        f.write("      // 此阶段触发代价惩罚机制，花时间计算图网络入口组 (ELS) 与图特征\n")
-        f.write("      auto els_features = get_min_super_sets_debug(...);\n\n")
-        f.write("      // Step 2: 获取完整的 Layer 2 特征，呼叫兜底层\n")
-        f.write("      int l2_res = L2_Model.predict(L2_Features);\n")
-        f.write("      \n      // 依据 L2_TARGET_MAP 执行具体的底层路由分发\n")
-        f.write("      switch(l2_res) {\n")
-        f.write("          case 0: return UNG-nTfalse;\n")
-        f.write("          case 1: return UNG-nTtrue;\n")
-        f.write("          case 2: return ACORN-gamma;\n")
-        f.write("          case 3: return ACORN-improved;\n")
-        f.write("          case 4: return NaviX;\n")
-        f.write("          case 5: return pre-filter;\n")
-        f.write("      }\n")
-        f.write("  }\n")
-        
-    print(f"\n✅ 全部构建完成！log已同步至: {report_path}")
+    print(f"✅ 数据集 {dataset_name} 处理完成！log已同步至: {report_path}")
+
+def main():
+    for dataset in DATASET_LIST:
+        process_single_dataset(dataset)
 
 if __name__ == "__main__":
     main()

@@ -18,7 +18,7 @@ DATASETS = ["Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","Various
 # 算法名称到文件夹名称的映射
 ALGO_FOLDERS = {
     'UNG-nTfalse': 'UNG-nTfalse',
-    # 'UNG-nTtrue': 'UNG-nTtrue',
+    'UNG-nTtrue': 'UNG-nTtrue',
     'ACORN-gamma': 'ACORN-gamma',
     'ACORN-improved': 'ACORN-gamma-improved',
     'NaviX': 'NaviX-ACORN',    
@@ -29,7 +29,7 @@ ALGO_FOLDERS = {
 MIN_RECALL = 0.90
 
 # 统一的输出图片/CSV根目录
-GLOBAL_OUTPUT_DIR = os.path.join(BASE_DIR, "EDA_Plots")
+GLOBAL_OUTPUT_DIR = os.path.join(BASE_DIR, "EDA_Plots_UNGnTtrue")
 os.makedirs(GLOBAL_OUTPUT_DIR, exist_ok=True)
 
 # ==========================================
@@ -43,7 +43,9 @@ def load_data(dataset_name):
     
     for algo_name, folder_name in ALGO_FOLDERS.items():
         search_pattern = os.path.join(BASE_DIR, dataset_name, "Results", folder_name, "Index*", "results", "query_details_repeat1.csv")
-        matched_files = glob.glob(search_pattern)
+        all_matched_files = glob.glob(search_pattern)
+        # --- 过滤掉路径中包含 "select_imp" 的文件 ---
+        matched_files = [f for f in all_matched_files if "select_imp" not in f]
         
         if not matched_files:
             print(f"  [Warning] 未找到 {algo_name} 的结果文件! 匹配路径: {search_pattern}")
@@ -61,29 +63,35 @@ def load_data(dataset_name):
         
     df_long = pd.concat(df_list, ignore_index=True)
     
-    # 统一时间度量标准 (包含对 UNG 和 pre-filter 的时间补偿)
-    print("[*] 正在统一时间度量标准...")
+    print("[*] 正在统一时间度量标准 (L1特征时间 / L2特征时间 / 端到端绝对时间)...")
     
     # 预处理：确保涉及计算的列存在且无空值
     if 'MinSupersetT_ms' not in df_long.columns:
         df_long['MinSupersetT_ms'] = 0.0
     else:
         df_long['MinSupersetT_ms'] = df_long['MinSupersetT_ms'].fillna(0.0)
-
-    if 'FeatureT_ms' not in df_long.columns:
-        df_long['FeatureT_ms'] = 0.0
-    else:
-        df_long['FeatureT_ms'] = df_long['FeatureT_ms'].fillna(0.0)
         
-    def calculate_true_time(row):
-        """根据算法类型计算包含前置开销的真实搜索耗时"""
+    def calculate_l1_time(row):
+        """L1 视角所需时间特征：只有选 UNG 时需要外加计算 ELS 的耗时"""
         if 'UNG' in row['Algorithm']:
             return row['search_time_ms'] + row['MinSupersetT_ms']
-        if 'pre-filter' in row['Algorithm']:
-            return row['search_time_ms'] + row['FeatureT_ms']
         return row['search_time_ms']
         
-    df_long['true_search_time_ms'] = df_long.apply(calculate_true_time, axis=1)
+    def calculate_l2_time(row):
+        """L2 视角所需时间特征：所有前置开销均视为已发生"""
+        return row['search_time_ms']
+
+    # L1 和 L2 时间维持纯加法计算，供下游模型脚本进行动态打标
+    df_long['L1_Time_ms'] = df_long.apply(calculate_l1_time, axis=1)
+    df_long['L2_Time_ms'] = df_long.apply(calculate_l2_time, axis=1)
+    
+    # 真正的端到端绝对时间，直接使用 C++ 输出的总 time_ms (最准确，供纯 EDA 数据分析用)
+    if 'Time_ms' in df_long.columns:
+        df_long['True_EndToEnd_Time_ms'] = df_long['Time_ms']
+    else:
+        print("  [Warning] 未检测到 time_ms 列，请检查 C++ 输出！暂用 search_time_ms 替代。")
+        df_long['True_EndToEnd_Time_ms'] = df_long['search_time_ms']
+    
     return df_long
 
 def load_features(dataset_name):
@@ -101,13 +109,13 @@ def load_features(dataset_name):
 # Step 2: 提炼最优表现与多源特征对齐
 # ==========================================
 def preprocess_and_align(df_long, dataset_name):
-    print(f"[*] 正在计算各算法在 Recall >= {MIN_RECALL} 下的最优耗时...")
+    print(f"[*] 正在拼装特征宽表 (只输出客观数据，不做任何打标逻辑)...")
     
     valid_mask = df_long['Recall'] >= MIN_RECALL
     df_valid = df_long[valid_mask]
     
     if not df_valid.empty:
-        idx_valid = df_valid.groupby(['Algorithm', 'QueryID'])['true_search_time_ms'].idxmin()
+        idx_valid = df_valid.groupby(['Algorithm', 'QueryID'])['True_EndToEnd_Time_ms'].idxmin()
         best_valid = df_valid.loc[idx_valid]
     else:
         best_valid = pd.DataFrame()
@@ -132,11 +140,11 @@ def preprocess_and_align(df_long, dataset_name):
     existing_base_features = [col for col in base_features_cols if col in feature_source.columns]
     features_df = feature_source[existing_base_features].drop_duplicates(subset=['QueryID']).set_index('QueryID')
     
-    # 宽表化算法耗时与 Recall
+    # 宽表化算法耗时与 Recall (客观记录 3 套时间)
     df_wide = df_best.pivot_table(
         index='QueryID', 
         columns='Algorithm', 
-        values=['Recall', 'true_search_time_ms'],
+        values=['Recall', 'L1_Time_ms', 'L2_Time_ms', 'True_EndToEnd_Time_ms', 'MinSupersetT_ms'],
         aggfunc='first'
     )
     df_wide.columns = [f"{col[0]}_{col[1]}" for col in df_wide.columns]
@@ -158,6 +166,11 @@ def preprocess_and_align(df_long, dataset_name):
 # Step 3: 数据分析、绘图及数据导出
 # ==========================================
 def perform_eda(df_final, output_dir):
+    """
+    注意：此处画图及寻找 Fastest_Algo 纯粹是为了 EDA 数据可视化。
+    不生成任何用于 ML 训练的标签 (不会把计算的最优写入宽表 CSV 中)。
+    画图统一使用用户的直观端到端感受时间 (True_EndToEnd_Time_ms)。
+    """
     algorithms = list(ALGO_FOLDERS.keys())
     
     # -----------------------------------------
@@ -186,12 +199,12 @@ def perform_eda(df_final, output_dir):
     plt.close()
 
     # -----------------------------------------
-    # 【图 2】：达标中位数耗时 (Median Search Time)
+    # 【图 2】：达标中位数绝对耗时 (Median Search Time)
     # -----------------------------------------
     median_times = {}
     for algo in algorithms:
         recall_col = f'Recall_{algo}'
-        time_col = f'true_search_time_ms_{algo}'
+        time_col = f'True_EndToEnd_Time_ms_{algo}'
         if time_col in df_final.columns:
             mask = df_final[recall_col] >= MIN_RECALL
             if mask.sum() > 0:
@@ -199,13 +212,13 @@ def perform_eda(df_final, output_dir):
             else:
                 median_times[algo] = 0
                 
-    df_p2 = pd.DataFrame(list(median_times.items()), columns=['Algorithm', 'Median_True_Search_Time_ms'])
+    df_p2 = pd.DataFrame(list(median_times.items()), columns=['Algorithm', 'Median_True_EndToEnd_Time_ms'])
     df_p2.to_csv(os.path.join(output_dir, "plot2_data_median_search_time.csv"), index=False)
                 
     plt.figure(figsize=(10, 6))
     ax2 = sns.barplot(x=list(median_times.keys()), y=list(median_times.values()), 
                       hue=list(median_times.keys()), palette='magma', legend=False)
-    plt.title(f'Median True Search Time (ms) for Successful Queries')
+    plt.title(f'Median True End-to-End Time (ms) for Successful Queries')
     plt.ylabel('Time (ms)')
     plt.xticks(rotation=45)
     for i, v in enumerate(median_times.values()):
@@ -216,26 +229,27 @@ def perform_eda(df_final, output_dir):
     plt.close()
 
     # -----------------------------------------
-    # 核心：计算每条查询的最优算法
+    # 辅助计算：找出全局基于端到端时间的最快算法 (仅用于画后续分析图)
     # -----------------------------------------
-    cost_cols = []
+    time_cols = []
+    temp_df = df_final.copy()
     for algo in algorithms:
-        time_col = f'true_search_time_ms_{algo}'
+        time_col = f'True_EndToEnd_Time_ms_{algo}'
         recall_col = f'Recall_{algo}'
-        cost_col = f'Cost_{algo}'
-        if time_col in df_final.columns:
-            df_final[cost_col] = np.where(df_final[recall_col] >= MIN_RECALL, df_final[time_col], np.inf)
-            cost_cols.append(cost_col)
+        valid_time_col = f'Valid_Time_{algo}'
+        if time_col in temp_df.columns:
+            temp_df[valid_time_col] = np.where(temp_df[recall_col] >= MIN_RECALL, temp_df[time_col], np.inf)
+            time_cols.append(valid_time_col)
             
-    df_final['Best_Cost'] = df_final[cost_cols].min(axis=1)
-    df_final['Best_Algo'] = df_final[cost_cols].idxmin(axis=1).str.replace('Cost_', '')
-    df_final.loc[df_final['Best_Cost'] == np.inf, 'Best_Algo'] = 'None_Qualified'
-    valid_df = df_final[df_final['Best_Algo'] != 'None_Qualified'].copy()
+    temp_df['Best_Time'] = temp_df[time_cols].min(axis=1)
+    temp_df['Fastest_Algo'] = temp_df[time_cols].idxmin(axis=1).str.replace('Valid_Time_', '')
+    temp_df.loc[temp_df['Best_Time'] == np.inf, 'Fastest_Algo'] = 'None_Qualified'
+    valid_df = temp_df[temp_df['Fastest_Algo'] != 'None_Qualified'].copy()
     
     # -----------------------------------------
-    # 【图 3】：算法统治率饼图 (Algorithm Dominance Pie)
+    # 【图 3】：端到端全局最快算法占比饼图 (Fastest Algorithm Pie)
     # -----------------------------------------
-    algo_counts = valid_df['Best_Algo'].value_counts()
+    algo_counts = valid_df['Fastest_Algo'].value_counts()
     
     df_p3 = algo_counts.reset_index()
     df_p3.columns = ['Algorithm', 'Dominance_Count']
@@ -245,7 +259,7 @@ def perform_eda(df_final, output_dir):
     plt.figure(figsize=(10, 8))
     colors = sns.color_palette('Set3')[0:len(algo_counts)]
     plt.pie(algo_counts, labels=algo_counts.index, autopct='%1.1f%%', startangle=140, colors=colors)
-    plt.title(f"Algorithm Dominance (Fastest & Recall >= {MIN_RECALL})")
+    plt.title(f"Fastest End-to-End Algorithm (Recall >= {MIN_RECALL})")
     plt.savefig(os.path.join(output_dir, "03_algorithm_dominance_pie.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
@@ -258,14 +272,14 @@ def perform_eda(df_final, output_dir):
         except:
             valid_df['Ppass_Bin'] = pd.cut(valid_df['GlobalPpass'], bins=8)
             
-        bin_algo_counts = valid_df.groupby(['Ppass_Bin', 'Best_Algo'], observed=False).size().unstack(fill_value=0)
+        bin_algo_counts = valid_df.groupby(['Ppass_Bin', 'Fastest_Algo'], observed=False).size().unstack(fill_value=0)
         bin_algo_ratio = bin_algo_counts.div(bin_algo_counts.sum(axis=1), axis=0)
         
         df_p4 = bin_algo_ratio.copy()
         df_p4.to_csv(os.path.join(output_dir, "plot4_data_dominance_by_ppass.csv"))
         
         ax = bin_algo_ratio.plot(kind='bar', stacked=True, figsize=(12, 6), cmap='tab10')
-        plt.title('Best Algorithm Distribution across GlobalPpass Bins')
+        plt.title('Fastest Algorithm Distribution across GlobalPpass Bins (End-to-End Time)')
         plt.xlabel('GlobalPpass Bins')
         plt.ylabel('Ratio of Best Performance')
         plt.xticks(rotation=45)
@@ -291,25 +305,25 @@ def perform_eda(df_final, output_dir):
         plt.close()
 
     # -----------------------------------------
-    # 【图 6】：散点图 (GlobalPpass vs Search Time)
+    # 【图 6】：散点图 (GlobalPpass vs End-to-End Search Time)
     # -----------------------------------------
-    cols_p6 = ['QueryID', 'GlobalPpass'] + [c for c in valid_df.columns if 'true_search_time_ms' in c]
+    cols_p6 = ['QueryID', 'GlobalPpass'] + [c for c in valid_df.columns if 'True_EndToEnd_Time_ms' in c]
     df_p6 = valid_df[cols_p6]
     df_p6.to_csv(os.path.join(output_dir, "plot6_data_scatter.csv"), index=False)
     
     plt.figure(figsize=(10, 6))
-    if 'true_search_time_ms_pre-filter' in valid_df.columns:
-        sns.scatterplot(data=valid_df, x='GlobalPpass', y='true_search_time_ms_pre-filter', 
+    if 'True_EndToEnd_Time_ms_pre-filter' in valid_df.columns:
+        sns.scatterplot(data=valid_df, x='GlobalPpass', y='True_EndToEnd_Time_ms_pre-filter', 
                         color='red', label='pre-filter', alpha=0.5, s=20)
-    if 'true_search_time_ms_ACORN-gamma' in valid_df.columns:
-        sns.scatterplot(data=valid_df, x='GlobalPpass', y='true_search_time_ms_ACORN-gamma', 
+    if 'True_EndToEnd_Time_ms_ACORN-gamma' in valid_df.columns:
+        sns.scatterplot(data=valid_df, x='GlobalPpass', y='True_EndToEnd_Time_ms_ACORN-gamma', 
                         color='blue', label='ACORN-gamma', alpha=0.5, s=20)
     
     plt.xscale('log')
     plt.yscale('log')
-    plt.title('GlobalPpass vs True Search Time (Log-Log Scale)')
+    plt.title('GlobalPpass vs True End-to-End Search Time (Log-Log Scale)')
     plt.xlabel('GlobalPpass (Log Scale)')
-    plt.ylabel('True Search Time (ms) (Log Scale)')
+    plt.ylabel('True End-to-End Time (ms) (Log Scale)')
     plt.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "06_ppass_vs_time_scatter.png"), dpi=300, bbox_inches='tight')
@@ -329,10 +343,12 @@ if __name__ == "__main__":
             dataset_output_dir = os.path.join(GLOBAL_OUTPUT_DIR, dataset)
             os.makedirs(dataset_output_dir, exist_ok=True)
             
+            # 宽表导出：此处导出的 CSV 是“干净”的，只有数据，不含“Best_Algo”等路由决策标签
             csv_output_path = os.path.join(dataset_output_dir, f"{dataset}_aligned_results.csv")
             df_final.to_csv(csv_output_path, index=False)
             print(f"[*] 【最全宽表】已导出至: {csv_output_path}")
             
+            # 画图函数会在内部创建一个拷贝(temp_df)去临时计算最快算法，不会污染 df_final
             perform_eda(df_final, dataset_output_dir)
         else:
             print(f"[!] 未加载到 {dataset} 的数据，跳过分析。")
