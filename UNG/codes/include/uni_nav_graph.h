@@ -71,6 +71,8 @@ namespace ANNS
 
     double intel_els_pred_time_ms;       // 记录预测 nTtrue/nTfalse 的耗时
     double route_pred_time_ms;           // 记录 SmartRoute/FastSmartRoute 推理的耗时
+    double l1_pred_time_ms = 0.0;
+    double l2_pred_time_ms = 0.0;
     double routing_total_time_ms;        // 记录整个路由决策阶段 (特征+预测+ELS计算) 的总耗时
     double bitmap_time_ms;         
     double feature_extract_time_ms;
@@ -411,19 +413,19 @@ namespace ANNS
       // idea1 selector
       std::unique_ptr<MethodSelector> _trie_method_selector;
       TrieStaticMetrics _trie_static_metrics; // 用于缓存 Trie 树的静态指标，避免重复计算
-      std::vector<float> calculate_idea1_features(const QueryStats &stats) const;
 
       // idea2 selector
       std::shared_ptr<faiss::IndexACORNFlat> _acorn_index;
       std::shared_ptr<faiss::IndexACORNFlat> _acorn_1_index;
       std::unique_ptr<MethodSelector> _ung_acorn_selector;
-      std::vector<float> calculate_idea2_features(const QueryStats &stats) const;
       std::optional<bool> check_idea2_heuristic_override(const std::string& dataset_name, size_t num_entry_groups) const;
       std::optional<bool> check_pre_trie_heuristic(const std::string& dataset_name, size_t query_length, size_t candidate_set_size) const;
 
       // smartroute selector
       std::unique_ptr<MethodSelector> _smart_route_selector;    // 单层 SmartRoute (5特征)
       std::unique_ptr<MethodSelector> _fast_route_l1_selector;  // FastSmartRoute L1 (3特征)
+      std::unique_ptr<MethodSelector> _fast_route_l2_selector;
+      int _l1_majority_acorn_id = 2; // 默认兜底为 2 (ACORN-gamma)，以防文件读取失败
       int determine_routing_strategy(
         int routing_mode, 
         int baseline_alg,

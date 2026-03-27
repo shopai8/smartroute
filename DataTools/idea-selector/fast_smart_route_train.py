@@ -28,7 +28,8 @@ except ImportError:
 # 1. 全局配置区域
 # ==========================================
 # 支持批量处理的数据集列表
-DATASET_LIST = ["Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"] 
+## "Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"
+DATASET_LIST = ["Laion"] 
 BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
 
 ALGO_LIST = ['ACORN-gamma', 'ACORN-improved', 'NaviX', 'UNG-nTfalse', 'UNG-nTtrue', 'pre-filter']
@@ -378,7 +379,7 @@ def process_single_dataset(dataset_name):
     
     for model_type in MODELS_TO_TRY:
         try:
-            res = train_and_evaluate_model(X_L1_train, y_L1_train, X_L1_test, y_L1_test, L1_TARGET_MAP, model_type, use_smote=True)
+            res = train_and_evaluate_model(X_L1_train, y_L1_train, X_L1_test, y_L1_test, L1_TARGET_MAP, model_type, use_smote=False)
             print(f"  > {model_type:<15} | 准确率: {res['acc']:.4%} | 耗时: {res['duration_ms']:.2f} ms")
             if res['acc'] > best_l1_acc:
                 best_l1_acc = res['acc']
@@ -402,6 +403,19 @@ def process_single_dataset(dataset_name):
     else:
         majority_acorn_algo = 'ACORN-gamma' # 默认兜底
     print(f"\n[Layer 1.5 极简策略] 选定 ACORN 家族多数派为: {majority_acorn_algo}")
+    
+    # ====== 导出多数派 ID 给 C++ 使用 ======
+    cpp_algo_map = {
+        'ACORN-gamma': 2, 
+        'ACORN-improved': 3, 
+        'NaviX': 4
+    }
+    majority_id = cpp_algo_map.get(majority_acorn_algo, 2) # 默认回退到 2
+    
+    majority_id_path = os.path.join(output_dir, "l1_majority_acorn_id.txt")
+    with open(majority_id_path, "w", encoding="utf-8") as f:
+        f.write(str(majority_id))
+    print(f"  > 已将 C++ 映射 ID ({majority_id}) 导出至: {majority_id_path}")
     
     # ==================================
     # 阶段二: Layer 2 自动竞技场

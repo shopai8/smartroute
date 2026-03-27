@@ -518,7 +518,7 @@ int main(int argc, char **argv)
    detail_out << "repeat,Lsearch,efs,QueryID,Time_ms,search_time_ms,core_search_time_ms,Recall,"         
               << "Algo_Choice,IsIntelElsUsed,IsTrieRec,"                                                         
               << "DistCalcs,NumNodeVisited,"                                                             
-              << "MinSupersetT_ms,IntelELS_PredT_ms,Route_PredT_ms,Routing_TotalT_ms,BitmapT_new_ms,FeatureT_ms," 
+              << "MinSupersetT_ms,IntelELS_PredT_ms,Route_PredT_ms,L1_PredT_ms,L2_PredT_ms,Routing_TotalT_ms,BitmapT_new_ms,FeatureT_ms," 
               << "AcornFilterType,"
               << "QuerySize,CandSize,ExactCandSize,GlobalPpass,"
               << "NumEntries,NumDescendants"
@@ -546,6 +546,9 @@ int main(int argc, char **argv)
                        << stats.get_min_super_sets_time_ms << ","
                        << stats.intel_els_pred_time_ms << ","
                        << stats.route_pred_time_ms << ","
+                       << stats.l1_pred_time_ms << ","
+                       << stats.l2_pred_time_ms << ","
+                       // ---------------------------------------------------
                        << stats.routing_total_time_ms << ","
                        << stats.bitmap_time_ms << ","
                        << stats.feature_extract_time_ms << ","
@@ -560,7 +563,6 @@ int main(int argc, char **argv)
          }
       }
    }
-
    detail_out.close();
    
    if (navix_index) {

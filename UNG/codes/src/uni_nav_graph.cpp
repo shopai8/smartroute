@@ -1128,7 +1128,7 @@ namespace ANNS
     * 4.返回值类型和具体含义：
     * - const std::bitset<16000000>&: 返回算好的掩码引用，避免二次计算和拷贝。
     */
-   const std::bitset<16000000>& UniNavGraph::get_exact_cand_size_and_mask(
+   /*const std::bitset<16000000>& UniNavGraph::get_exact_cand_size_and_mask(
       const std::vector<LabelType>& query_labels,
       size_t& cand_size) const
    {
@@ -1162,8 +1162,8 @@ namespace ANNS
       
       cand_size = final_bitmap.count();
       return final_bitmap;
-   }
-   /*const std::bitset<16000000>& UniNavGraph::get_exact_cand_size_and_mask(
+   }*/
+   const std::bitset<16000000>& UniNavGraph::get_exact_cand_size_and_mask(
     const std::vector<LabelType>& query_labels,
     size_t& cand_size) const
    {
@@ -1226,7 +1226,7 @@ namespace ANNS
       
       cand_size = final_bitmap.count();
       return final_bitmap;
-   }*/
+   }
 
    /**
     * 1.接收预先算好的查询掩码，直接执行暴力距离计算。
@@ -2527,648 +2527,41 @@ namespace ANNS
    //fxy_add
    void UniNavGraph::warmup_selectors(uint32_t num_threads)
    {
-      // 预热 Idea1 的 Trie 方法选择器
+      // 预热 Idea1 的 Trie 方法选择器 (注意：现在只用 3 个特征了！)
       if (_trie_method_selector != nullptr)
       {
          std::cout << "- Warming up Trie Method Selector (Idea1)..." << std::endl;
-         // 创建一个符合模型输入尺寸的虚拟特征向量 ，特征数量为7
-         std::vector<float> dummy_features1(7, 0.0f);
-
+         std::vector<float> dummy_features1(3, 0.0f); // 改为 3
 #pragma omp parallel for num_threads(num_threads)
-         for (int i = 0; i < num_threads; ++i)
-         {
-            // 每个线程都调用一次 predict，触发其内部的初始化
-            _trie_method_selector->predict(dummy_features1);
-         }
+         for (int i = 0; i < num_threads; ++i) _trie_method_selector->predict(dummy_features1);
          std::cout << "- Trie Method Selector is warm." << std::endl;
       }
 
-//       // 预热 Idea2 的 UNG/ACORN 选择器
-//       if (_ung_acorn_selector != nullptr)
-//       {
-//          std::cout << "- Warming up UNG/ACORN Selector (Idea2)..." << std::endl;
-//          // 创建一个符合模型输入尺寸的虚拟特征向量 ，特征数量为6
-//          std::vector<float> dummy_features2(6, 0.0f);
-
-// #pragma omp parallel for num_threads(num_threads)
-//          for (int i = 0; i < num_threads; ++i)
-//          {
-//             _ung_acorn_selector->predict(dummy_features2);
-//          }
-//          std::cout << "- UNG/ACORN Selector is warm." << std::endl;
-//       }
-
-         if (_smart_route_selector) {
-            std::cout << "- Warming up Smart Route Selector..." << std::endl;
-            std::vector<float> dummy5(5, 0.0f);
+      if (_smart_route_selector) {
+         std::cout << "- Warming up Smart Route Selector..." << std::endl;
+         std::vector<float> dummy5(5, 0.0f);
 #pragma omp parallel for num_threads(num_threads)
-            for (int i = 0; i < num_threads; ++i) _smart_route_selector->predict(dummy5);
-         }
-         if (_fast_route_l1_selector) {
-            std::cout << "- Warming up Fast Route L1 Selector..." << std::endl;
-            std::vector<float> dummy3(3, 0.0f);
+         for (int i = 0; i < num_threads; ++i) _smart_route_selector->predict(dummy5);
+      }
+      
+      if (_fast_route_l1_selector) {
+         std::cout << "- Warming up Fast Route L1 Selector..." << std::endl;
+         std::vector<float> dummy3(3, 0.0f);
 #pragma omp parallel for num_threads(num_threads)
-            for (int i = 0; i < num_threads; ++i) _fast_route_l1_selector->predict(dummy3);
-         }
+         for (int i = 0; i < num_threads; ++i) _fast_route_l1_selector->predict(dummy3);
+      }
+
+      // --- 预热 L2 Selector ---
+      if (_fast_route_l2_selector) {
+         std::cout << "- Warming up Fast Route L2 Selector..." << std::endl;
+         std::vector<float> dummy_l2(5, 0.0f);
+#pragma omp parallel for num_threads(num_threads)
+         for (int i = 0; i < num_threads; ++i) _fast_route_l2_selector->predict(dummy_l2);
+      }
    }
 
-   // fxy_add
-   std::vector<float> UniNavGraph::calculate_idea1_features(const QueryStats &stats) const
-   {
-      std::vector<float> features;
-      const float epsilon = 1e-9f;
-      const float query_size = static_cast<float>(stats.query_length);
-      const float cand_size = static_cast<float>(stats.candidate_set_size);
-      const float trie_nodes = static_cast<float>(stats.trie_total_nodes);
-      const float trie_cardinality = static_cast<float>(stats.trie_label_cardinality);
-      const float trie_branching = static_cast<float>(stats.trie_avg_branching_factor);
-
-      // const float log_cand_size = std::log1p(cand_size);   // 'Log_CandSize'
-      // const float log_query_size = std::log1p(query_size); // 'Log_QuerySize'
-      // const float cand_coverage_ratio = cand_size / (trie_nodes + epsilon);            // 'Cand_Coverage_Ratio'
-      // const float query_cardinality_ratio = query_size / (trie_cardinality + epsilon); // 'Query_Cardinality_Ratio'
-      // const float query_path_density = query_size * trie_branching; // 'Query_Path_Density'
-      // const float avg_nodes_per_label = trie_nodes / (trie_cardinality + epsilon);
-      // const float cand_selectivity = avg_nodes_per_label / (cand_size + epsilon); // 'Cand_Selectivity'
-      // const float query_cand_ratio = query_size / (cand_size + epsilon);          // 'Query_Cand_Ratio'
-      // const float cand_x_query_interaction = cand_size * query_size;    // 'Cand_x_Query_Interaction'
-      // const float branching_x_cand_size = trie_branching * cand_size;   // 'Branching_x_CandSize'
-      // const float branching_x_query_size = trie_branching * query_size; // 'Branching_x_QuerySize'
-      // const float cand_size_sq = cand_size * cand_size;    // 'CandSize_sq'
-      // const float query_size_sq = query_size * query_size; // 'QuerySize_sq'
-      // const float log_cand_x_log_query = log_cand_size * log_query_size; // 'LogCand_x_LogQuery'
-
-      if (_dataset == "celeba")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // 7. Cand_Selectivity   
-      }
-      else if (_dataset == "bigann")
-      {
-         features.reserve(7);
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // 7. Cand_Selectivity
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-      }
-      else if (_dataset == "Genome")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // 7. Cand_Selectivity
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size);                                                           // 5. CandSize
-         
-
-         // features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         // features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         // features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         // features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         // features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         // features.push_back(cand_size);                                                           // 5. CandSize
-         // features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // 7. Cand_Selectivity
-      }
-      else if (_dataset == "words")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(query_size);                                                          // 8. QuerySize
-         features.push_back(query_size * trie_branching);                                         // 9. Query_Path_Density
-         features.push_back(query_size / (trie_cardinality + epsilon));                           // 7. Query_Cardinality_Ratio
-         features.push_back(trie_branching * query_size);                                         // 3. Branching_x_QuerySize
-         features.push_back(query_size * query_size);                                             // 4. QuerySize_sq
-      }
-      else if (_dataset == "MTG")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                         // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size)); // 2. LogCand_x_LogQuery
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize    
-      }
-      else if (_dataset == "Reviews")
-      {
-         features.reserve(7);
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size)); // 2. LogCand_x_LogQuery
-         features.push_back(query_size);                                     // 8. QuerySize
-         features.push_back(query_size * trie_branching);                    // 9. Query_Path_Density 
-         features.push_back(query_size / (trie_cardinality + epsilon));      // 7. Query_Cardinality_Ratio
-         features.push_back(trie_branching * query_size);                     // 3. Branching_x_QuerySize
-         features.push_back(query_size * query_size);                        // 4. QuerySize_sq
-         features.push_back(cand_size * query_size);                         // 1. Cand_x_Query_Interaction  
-      }
-      else if (_dataset == "Amazon")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                         // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size)); // 2. LogCand_x_LogQuery
-         features.push_back(query_size);                                     // 8. QuerySize
-         features.push_back(query_size * trie_branching);                    // 9. Query_Path_Density 
-         features.push_back(query_size / (trie_cardinality + epsilon));      // 7. Query_Cardinality_Ratio
-         features.push_back(trie_branching * query_size);                    // 3. Branching_x_QuerySize
-         features.push_back(query_size * query_size);                        // 4. QuerySize_sq
-
-         // features.push_back(cand_size * query_size);                         // 1. Cand_x_Query_Interaction
-         // features.push_back(std::log1p(cand_size) * std::log1p(query_size)); // 2. LogCand_x_LogQuery
-         // features.push_back(query_size);                                     // 8. QuerySize
-         // features.push_back(query_size * trie_branching);                    // 9. Query_Path_Density 
-         // features.push_back(query_size / (trie_cardinality + epsilon));      // 7. Query_Cardinality_Ratio
-         // features.push_back(trie_branching * query_size);                    // 3. Branching_x_QuerySize
-         // features.push_back(query_size * query_size);                        // 4. QuerySize_sq
-      }
-      else if (_dataset == "Music")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(query_size);                                                          // 8. QuerySize
-         features.push_back(query_size * trie_branching);                                         // 9. Query_Path_Density
-         features.push_back(query_size / (trie_cardinality + epsilon));                           // 7. Query_Cardinality_Ratio
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio  
-      }
-      else if (_dataset == "openpmc")
-      {
-         features.reserve(7);
-         features.push_back(query_size / (cand_size + epsilon));                                  // 7. Query_Cand_Ratio
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery                                                       // 8. QuerySize   
-      }
-      else if (_dataset == "AllNews")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         
-         // features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         // features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         // features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         // features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         // features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         // features.push_back(cand_size);                                                           // 5. CandSize
-         // features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-      }
-      else if (_dataset == "Russian")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         features.push_back(query_size / (cand_size + epsilon));                                  // 7. Query_Cand_Ratio
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-      }
-      else if (_dataset == "VariousImg")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery 
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio 
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-          
-      }
-      else if (_dataset == "Tiktok")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery 
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-  
-      }
-      else if (_dataset == "cord_19")
-      {
-         features.reserve(7);
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-      }
-      else if (_dataset == "Laion")
-      {
-         features.reserve(7);
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction 
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery   
-      }
-      else if (_dataset == "BookReviews")
-      {
-         features.reserve(7);
-         features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction 
-         features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         features.push_back(cand_size);                                                           // 5. CandSize
-         features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-
-         // features.push_back(cand_size * query_size);                                              // 1. Cand_x_Query_Interaction 
-         // features.push_back(std::log1p(cand_size) * std::log1p(query_size));                      // 2. LogCand_x_LogQuery
-         // features.push_back(cand_size / (trie_nodes + epsilon));                                  // 6. Cand_Coverage_Ratio
-         // features.push_back(cand_size * cand_size);                                               // 4. CandSize_sq
-         // features.push_back(trie_branching * cand_size);                                          // 3. Branching_x_CandSize
-         // features.push_back(cand_size);                                                           // 5. CandSize
-         // features.push_back((trie_nodes / (trie_cardinality + epsilon)) / (cand_size + epsilon)); // Cand_Selectivity
-      }
-      else {
-         std::cerr << "Warning: Dataset name not recognized for Idea1 feature calculation." << std::endl;
-      }
-      return features;
-   }
 
    // fxy_add
-   std::vector<float> UniNavGraph::calculate_idea2_features(const QueryStats &stats) const
-   {
-      std::vector<float> features;
-      const float epsilon = 1e-9f;
-      const float num_descendants = static_cast<float>(stats.num_lng_descendants);
-      const float total_coverage = stats.entry_group_total_coverage;
-      const float num_entries = static_cast<float>(stats.num_entry_points);
-
-      // const float log_num_entries = std::log1p(num_entries);         // 'LogNumEntries'
-      // const float log_num_descendants = std::log1p(num_descendants); // 'LogNumDescendants'
-      // const float log_total_coverage = std::log1p(total_coverage);   // 'LogTotalCoverage'
-      // const float coverage_squared = total_coverage * total_coverage;      // 'CoverageSquared'
-      // const float descendants_squared = num_descendants * num_descendants; // 'DescendantsSquared'
-      // const float desc_cov_interaction = num_descendants * total_coverage;  // 'DescCovInteraction'
-      // const float entries_cov_interaction = num_entries * total_coverage;   // 'EntriesCovInteraction'
-      // const float entries_desc_interaction = num_entries * num_descendants; // 'EntriesDescInteraction'
-      // const float desc_per_entry = num_descendants / (num_entries + epsilon); // 'DescPerEntry'
-      // const float cov_per_entry = total_coverage / (num_entries + epsilon);   // 'CovPerEntry'
-
-      if (_dataset == "celeba")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);   // 2. CoverageSquared
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(total_coverage);                    // 6. TotalCoverage
-         features.push_back(std::log1p(total_coverage));        // 3. LogTotalCoverage
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-      }
-      else if (_dataset == "bigann")
-      {
-         features.reserve(6);
-         features.push_back(std::log1p(total_coverage));        // 3. LogTotalCoverage
-         features.push_back(total_coverage * total_coverage);   // 2. CoverageSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(total_coverage);                    // 6. TotalCoverage
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared   
-      }
-      else if (_dataset == "Genome")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(total_coverage);                   // TotalCoverage
-         features.push_back(std::log1p(total_coverage));       // LogTotalCoverage
-         features.push_back(std::log1p(num_descendants));      // LogNumDescendants
-         features.push_back(num_descendants * total_coverage); // DescCovInteraction
-         features.push_back(num_entries * num_descendants);    // EntriesDescInteraction
-         
-         // features.push_back(num_entries * num_descendants);    // EntriesDescInteraction
-         // features.push_back(num_descendants * total_coverage); // DescCovInteraction
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(total_coverage));       // LogTotalCoverage
-         // features.push_back(std::log1p(num_descendants));      // LogNumDescendants
-         // features.push_back(total_coverage);                   // TotalCoverage
-      }
-      else if (_dataset == "words")
-      {
-         features.reserve(6);
-         features.push_back(num_descendants * total_coverage); // DescCovInteraction
-         features.push_back(num_entries * num_descendants);    // EntriesDescInteraction
-         features.push_back(num_entries * total_coverage);     // EntriesCovInteraction
-         features.push_back(std::log1p(total_coverage));       // LogTotalCoverage
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(total_coverage / (num_entries + epsilon)); // CovPerEntry
-      }
-      else if (_dataset == "MTG")
-      {
-         features.reserve(6);
-         features.push_back(std::log1p(num_entries));           // 5. LogNumEntries
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(num_entries);                       // 4. NumEntries
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(num_entries * total_coverage);      // EntriesCovInteraction
-         features.push_back(total_coverage);                           // 3. TotalCoverage
-      }
-      else if (_dataset == "Reviews")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage);                           // 3. TotalCoverage 
-         features.push_back(total_coverage / (num_entries + epsilon)); // CovPerEntry
-         features.push_back(num_descendants * total_coverage); // DescCovInteraction
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-  
-         // features.push_back(num_entries);                       // 4. NumEntries
-         // features.push_back(std::log1p(num_entries));           // 5. LogNumEntries
-         // features.push_back(num_entries * total_coverage);  // 1. EntriesCovInteraction
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(total_coverage);                           // 3. TotalCoverage  
-      }
-      else if (_dataset == "Amazon")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(num_descendants);       // NumDescendants
-
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(total_coverage);                           // 3. TotalCoverage
-         // features.push_back(num_descendants);       // NumDescendants
-      }
-      else if (_dataset == "Music")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(num_descendants);       // NumDescendants
-         features.push_back(total_coverage);                           // 3. TotalCoverage
-
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(total_coverage);                           // 3. TotalCoverage
-         // features.push_back(num_descendants);       // NumDescendants
-      }
-      else if (_dataset == "openpmc")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage);                           // 3. TotalCoverage
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(num_entries);                       // 4. NumEntries
-         features.push_back(num_entries * num_descendants); // 6. EntriesDescInteraction
-      }
-      else if (_dataset == "AllNews")
-      {
-         features.reserve(6);
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(num_descendants);       // NumDescendants
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(total_coverage);               // TotalCoverage
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(num_descendants);       // NumDescendants
-      }
-      else if (_dataset == "Russian")
-      {
-         features.reserve(6);
-         features.push_back(num_descendants * total_coverage);  // DescCovInteraction
-         features.push_back(total_coverage * total_coverage);   // CoverageSquared
-         features.push_back(num_entries * total_coverage);      // EntriesCovInteraction
-         features.push_back(std::log1p(total_coverage));        // LogTotalCoverage
-         features.push_back(total_coverage);                    // TotalCoverage
-         features.push_back(num_entries);                       // NumEntries   
-      }
-      else if (_dataset == "VariousImg")
-      {
-         features.reserve(6);
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage * total_coverage);   // CoverageSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(num_descendants / (num_entries + epsilon));// DescPerEntry
-
-      }
-      else if (_dataset == "Tiktok")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage);               // TotalCoverage
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         // features.push_back(total_coverage);               // TotalCoverage
-      }
-      else if (_dataset == "cord_19")
-      {
-         features.reserve(6);
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants);       // NumDescendants
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared    
-      }
-      else if (_dataset == "Laion")
-      {
-         features.reserve(6);
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants);       // NumDescendants
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(total_coverage);               // TotalCoverage
-  
-
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared  
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(total_coverage);               // TotalCoverage
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage    
-      }
-      else if (_dataset == "BookReviews")
-      {
-         features.reserve(6);
-         features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         features.push_back(total_coverage);               // TotalCoverage 
-         features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-           
-         // features.push_back(std::log1p(num_descendants));       // 4. LogNumDescendants
-         // features.push_back(total_coverage * total_coverage);  // CoverageSquared
-         // features.push_back(num_descendants * num_descendants); // 5. DescendantsSquared
-         // features.push_back(std::log1p(total_coverage));               // 2. LogTotalCoverage
-         // features.push_back(num_descendants * total_coverage);  // 1. DescCovInteraction
-         // features.push_back(total_coverage);               // TotalCoverage   
-      }
-      else{
-         std::cerr << "Warning: Dataset name not recognized for Idea2 feature calculation." << std::endl;
-      }
-
-      return features;
-   }
-
-   // fxy_add
-   /*void UniNavGraph::calculate_query_features_only(
-       std::shared_ptr<IStorage> query_storage,
-       uint32_t num_threads,
-       const std::string &output_csv_path,
-       bool is_new_trie_method,
-       bool is_rec_more_start)
-   {
-      std::cout << "Starting unified feature calculation for Idea1 & Idea2..." << std::endl;
-      auto num_queries = query_storage->get_num_points();
-      std::vector<QueryStats> query_stats(num_queries);
-
-      // =================================================================
-      // 阶段一: 并行计算所有查询的特征，并存储在内存中
-      // =================================================================
-      omp_set_num_threads(num_threads);
-#pragma omp parallel for schedule(dynamic, 1)
-      for (auto id = 0; id < num_queries; ++id)
-      {
-         auto &stats = query_stats[id];
-         const auto &query_labels = query_storage->get_label_set(id);
-
-         // --- 计算 Idea1 特征 ---
-         stats.query_length = query_labels.size(); // QuerySize
-         if (!query_labels.empty())
-         {
-            stats.candidate_set_size = _trie_index.get_candidate_count_for_label(query_labels.back()); // CandSize
-         }
-         // 复制Trie静态特征
-         const auto &trie_metrics = _trie_static_metrics;
-         stats.trie_total_nodes = trie_metrics.total_nodes;
-         stats.trie_label_cardinality = trie_metrics.label_cardinality;
-         stats.trie_avg_path_length = trie_metrics.avg_path_length;
-         stats.trie_avg_branching_factor = trie_metrics.avg_branching_factor;
-
-         // --- 计算 Idea2 特征 ---
-         // 1. 获取入口组 (这是计算后续特征的前提)
-         std::vector<IdxType> entry_group_ids;
-         static std::atomic<int> temp_counter{0}; // 临时的计数器以满足函数签名
-         get_min_super_sets_debug(query_labels, entry_group_ids, false, true, temp_counter, is_new_trie_method, is_rec_more_start, stats,false);
-
-         // 2. 计算 NumDescendants 和 TotalCoverage
-         if (!entry_group_ids.empty())
-         {
-            stats.num_entry_points = entry_group_ids.size(); // NumEntries
-            stats.num_lng_descendants = [&]
-            {
-               roaring::Roaring desc;
-               for (auto gid : entry_group_ids)
-                  if (gid > 0 && gid <= _num_groups)
-                     desc |= _lng_descendants_rb[gid];
-               return desc.cardinality();
-            }(); // NumDescendants
-
-            stats.entry_group_total_coverage = [&]
-            {
-               roaring::Roaring cov;
-               for (auto gid : entry_group_ids)
-                  if (gid > 0 && gid <= _num_groups)
-                     cov |= _covered_sets_rb[gid];
-               return static_cast<float>(cov.cardinality()) / _num_points;
-            }(); // TotalCoverage
-         }
-         else
-         {
-            stats.num_entry_points = 0;
-            stats.num_lng_descendants = 0;
-            stats.entry_group_total_coverage = 0.0f;
-         }
-      }
-      std::cout << "In-memory feature calculation finished for " << num_queries << " queries." << std::endl;
-
-      // =================================================================
-      // 阶段二: 将内存中的所有统计数据一次性写入CSV文件
-      // =================================================================
-      std::cout << "Now writing all features to CSV file: " << output_csv_path << std::endl;
-      std::ofstream outfile(output_csv_path);
-      if (!outfile.is_open())
-      {
-         std::cerr << "FATAL ERROR: Could not open file to save features: " << output_csv_path << std::endl;
-         return; // 提前退出
-      }
-
-      // 写入CSV表头 (包含Idea1和Idea2的所有特征)
-      outfile << "QueryID,QuerySize,CandSize,TrieTotalNodes,TrieLabelCardinality,TrieAvgBranchingFactor,"
-              << "NumEntries,NumDescendants,TotalCoverage\n";
-
-      // 遍历所有查询的统计结果并写入文件
-      for (size_t i = 0; i < query_stats.size(); ++i)
-      {
-         const auto &stats = query_stats[i];
-
-         outfile << i << ","
-                 // Idea1 features
-                 << stats.query_length << ","
-                 << stats.candidate_set_size << ","
-                 << stats.trie_total_nodes << ","
-                 << stats.trie_label_cardinality << ","
-                 << stats.trie_avg_branching_factor << ","
-                 // Idea2 features
-                 << stats.num_entry_points << ","
-                 << stats.num_lng_descendants << ","
-                 << stats.entry_group_total_coverage << "\n";
-      }
-
-      outfile.close();
-      std::cout << "Successfully saved all features to " << output_csv_path << std::endl;
-   }*/
-
 #include <future>   
 #include <chrono>   
 #include <ctime>    
@@ -3349,8 +2742,6 @@ void UniNavGraph::calculate_query_features_only(
 }
 
 
-
-
    //fxy_add: 在idea2之前，看看入口组个数，决定是否强制执行acorn
    std::optional<bool> UniNavGraph::check_idea2_heuristic_override(const std::string& dataset_name, size_t num_entry_groups) const
    {
@@ -3459,6 +2850,7 @@ void UniNavGraph::calculate_query_features_only(
       }
 
       // --- 模式 2: FastSmartRoute ---
+      // --- 模式 2: FastSmartRoute ---
       if (routing_mode == 2) {
          auto l1_start = std::chrono::high_resolution_clock::now();
          int l1_decision = 0; 
@@ -3468,40 +2860,63 @@ void UniNavGraph::calculate_query_features_only(
                float pred_val = _fast_route_l1_selector->predict(l1_features);
                l1_decision = static_cast<int>(std::round(pred_val));
          }
-         stats.route_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - l1_start).count();
+         
+         stats.l1_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - l1_start).count();
+         stats.route_pred_time_ms = stats.l1_pred_time_ms;
 
-         // 如果归入 UNG 家族 (0 或 1)
-         if (l1_decision == 0 || l1_decision == 1) {
-               bool use_nT_true = false;
-               if (_trie_method_selector) {
-                  stats.is_intel_els_used = true; // 只有明确调用 IntelELS 模型，这里才为 true!
-                  
-                  auto intel_els_start = std::chrono::high_resolution_clock::now();
-                  const auto &trie_metrics = _trie_static_metrics;
-                  stats.trie_total_nodes = trie_metrics.total_nodes;
-                  stats.trie_label_cardinality = trie_metrics.label_cardinality;
-                  stats.trie_avg_path_length = trie_metrics.avg_path_length;
-                  stats.trie_avg_branching_factor = trie_metrics.avg_branching_factor;
+         // L1 Map: {'NEED_ELS': 0, 'ACORN_Family': 1, 'pre-filter': 2}
+         if (l1_decision == 2) return 5; // 短路：直接执行 C++ 的 pre-filter(5)
+         if (l1_decision == 1) return _l1_majority_acorn_id; // 短路：直接执行训练阶段计算出的多数派兜底
 
-                  auto idea1_features = calculate_idea1_features(stats);
-                  use_nT_true = (_trie_method_selector->predict(idea1_features) > 0.5f);
-                  // use_nT_true = _trie_method_selector->predict(idea1_features);
-                  stats.intel_els_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - intel_els_start).count();
-               }
-               stats.is_trie_recursive = use_nT_true;
-
-               auto els_start = std::chrono::high_resolution_clock::now();
-               static std::atomic<int> counter{0};
-               get_min_super_sets_debug(query_labels, entry_group_ids, false, true, counter, use_nT_true, is_rec_more_start, stats, false);
-               stats.get_min_super_sets_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - els_start).count();
-               stats.num_entry_points = entry_group_ids.size();
-               
-               return use_nT_true ? 1 : 0; 
-         } 
-         else {
-               // 完美跳过 ELS！
-               return l1_decision; 
+         // 如果走到这里，说明 L1 判定为 0 (NEED_ELS)，开始计算 ELS
+         bool use_nT_true = false;
+         if (_trie_method_selector) {
+            stats.is_intel_els_used = true; 
+            auto intel_els_start = std::chrono::high_resolution_clock::now();
+            
+            std::vector<float> els_features = {f_qsize, f_cand, f_ppass};
+            use_nT_true = (_trie_method_selector->predict(els_features) > 0.5f);
+            
+            stats.intel_els_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - intel_els_start).count();
          }
+         stats.is_trie_recursive = use_nT_true;
+
+         // 获取 Entry Group IDs
+         auto els_start = std::chrono::high_resolution_clock::now();
+         static std::atomic<int> counter{0};
+         get_min_super_sets_debug(query_labels, entry_group_ids, false, true, counter, use_nT_true, is_rec_more_start, stats, false);
+         stats.get_min_super_sets_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - els_start).count();
+         stats.num_entry_points = entry_group_ids.size();
+         
+         // 补全 L2 需要的拓扑特征
+         std::unordered_set<IdxType> naive_desc;
+         for (auto gid : entry_group_ids) {
+               if (gid > 0 && gid <= _num_groups) {
+                  for (auto desc_id : _label_nav_graph->_lng_descendants[gid]) naive_desc.insert(desc_id);
+               }
+         }
+         stats.num_lng_descendants = naive_desc.size();
+
+         // 提交至 L2 Router 裁判层
+         auto l2_start = std::chrono::high_resolution_clock::now();
+         int l2_decision = 0;
+         if (_fast_route_l2_selector) {
+            std::vector<float> l2_features = {f_qsize, f_cand, f_ppass, static_cast<float>(stats.num_entry_points), static_cast<float>(stats.num_lng_descendants)};
+            float pred_val = _fast_route_l2_selector->predict(l2_features);
+            l2_decision = static_cast<int>(std::round(pred_val));
+         }
+         
+         stats.l2_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - l2_start).count();
+         stats.route_pred_time_ms += stats.l2_pred_time_ms;
+
+         // L2 Map: {'UNG_Family': 0, 'ACORN-gamma': 1, 'ACORN-improved': 2, 'NaviX': 3, 'pre-filter': 4}
+         if (l2_decision == 0) return use_nT_true ? 1 : 0;
+         if (l2_decision == 1) return 2;
+         if (l2_decision == 2) return 3;
+         if (l2_decision == 3) return 4; // 对应 C++ 的 NaviX-ACORN (4)
+         if (l2_decision == 4) return 5;
+         
+         return 0; // Fallback
       }
       return 0; // Fallback
    }
@@ -4454,7 +3869,7 @@ void UniNavGraph::calculate_query_features_only(
       std::cout << " _num_groups = " << _num_groups << std::endl;
 
       // load idea1 selector
-      std::string model_path = selector_modle_prefix + "/idea1/idea1_selector_model_final.onnx";
+      std::string model_path = selector_modle_prefix + "/intelElS/idea1_selector_model_final.onnx";
       std::cout << "Loading Trie method selector model from " << model_path << " ..." << std::endl;
       try
       {
@@ -4475,28 +3890,6 @@ void UniNavGraph::calculate_query_features_only(
          _trie_method_selector = nullptr;
       }
 
-      // // load idea2 selector
-      // std::string idea2_model_path = selector_modle_prefix + "/idea2/idea2_selector_model_final.onnx";
-      // std::cout << "Loading Idea2 Selector model from " << idea2_model_path << " ..." << std::endl;
-      // if (fs::exists(idea2_model_path))
-      // {
-      //    std::cout << "- Loading Idea2 Selector model from: " << idea2_model_path << std::endl;
-      //    try
-      //    {
-      //       _ung_acorn_selector = std::make_unique<MethodSelector>(idea2_model_path);
-      //    }
-      //    catch (const std::runtime_error &e)
-      //    {
-      //       std::cerr << "  - [ERROR] Failed to initialize Idea2 Selector: " << e.what() << std::endl;
-      //       _ung_acorn_selector = nullptr;
-      //    }
-      // }
-      // else
-      // {
-      //    std::cout << "- [INFO] Idea2 Selector model not found at: " << idea2_model_path << ". Selector will be disabled." << std::endl;
-      //    _ung_acorn_selector = nullptr;
-      // }
-
       // --- 加载 SmartRoute 模型 (5特征) ---
       std::string sr_model_path = selector_modle_prefix + "/naive_smart_route/naive_smart_route.onnx";
       if (fs::exists(sr_model_path)) {
@@ -4511,8 +3904,28 @@ void UniNavGraph::calculate_query_features_only(
       if (fs::exists(fsr_l1_model_path)) {
          _fast_route_l1_selector = std::make_unique<MethodSelector>(fsr_l1_model_path);
          std::cout << "- FastSmartRoute L1 Model loaded." << std::endl;
+
+         std::string majority_id_path = selector_modle_prefix + "/fast_smart_route/l1_majority_acorn_id.txt";
+         if (fs::exists(majority_id_path)) {
+             std::ifstream infile(majority_id_path);
+             if (infile >> _l1_majority_acorn_id) {
+                 std::cout << "- FastSmartRoute L1 majority ACORN ID loaded: " << _l1_majority_acorn_id << std::endl;
+             }
+         } else {
+             std::cout << "- [Warning] l1_majority_acorn_id.txt not found, using default: " << _l1_majority_acorn_id << std::endl;
+         }
+
       } else {
          _fast_route_l1_selector = nullptr;
+      }
+
+      // --- 加载 FastSmartRoute L2 模型 (5特征) ---
+      std::string fsr_l2_model_path = selector_modle_prefix + "/fast_smart_route/l2_router.onnx";
+      if (fs::exists(fsr_l2_model_path)) {
+         _fast_route_l2_selector = std::make_unique<MethodSelector>(fsr_l2_model_path);
+         std::cout << "- FastSmartRoute L2 Model loaded." << std::endl;
+      } else {
+         _fast_route_l2_selector = nullptr;
       }
 
       // === load ACORN index ===

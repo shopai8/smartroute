@@ -1,0 +1,505 @@
+python3 /home/fengxiaoyao/FilterVector/FilterVectorCode/DataTools/idea-selector/naive_smart_route_train.py
+
+============================================================
+🚀 开始处理数据集: Amazon | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 839 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  RandomForest     | 88.3899%           | 868.58             | 244.57            
+  XGBoost          | 87.6232%           | 8967.49            | 4.54              
+  LightGBM         | 87.6232%           | 3066.49            | 3.32              
+  DecisionTree     | 86.7470%           | 5.98               | 0.24              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/NaiveRoute_Report_Amazon_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/Predictions_Amazon_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/NaiveRoute_Report_Amazon_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/Predictions_Amazon_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/NaiveRoute_Report_Amazon_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/Predictions_Amazon_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/NaiveRoute_Report_Amazon_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Amazon/SelectModels/naive_smart_route_2/Predictions_Amazon_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: BookReviews | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 173 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 97.8908%           | 2146.58            | 2.73              
+  RandomForest     | 97.6427%           | 367.52             | 75.71             
+  LightGBM         | 97.6427%           | 2759.85            | 2.20              
+  DecisionTree     | 97.3945%           | 2.38               | 0.18              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_BookReviews_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/Predictions_BookReviews_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_BookReviews_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/Predictions_BookReviews_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_BookReviews_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/Predictions_BookReviews_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_BookReviews_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/SelectModels/naive_smart_route_2/Predictions_BookReviews_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: Genome | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 1067 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 91.2900%           | 2078.39            | 2.79              
+  RandomForest     | 87.3208%           | 326.08             | 64.27             
+  LightGBM         | 85.3363%           | 3143.72            | 8.47              
+  DecisionTree     | 81.3671%           | 6.36               | 0.23              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/NaiveRoute_Report_Genome_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/Predictions_Genome_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/NaiveRoute_Report_Genome_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/Predictions_Genome_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/NaiveRoute_Report_Genome_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/Predictions_Genome_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/NaiveRoute_Report_Genome_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Genome/SelectModels/naive_smart_route_2/Predictions_Genome_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: Music | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 553 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 90.2970%           | 1536.62            | 2.72              
+  RandomForest     | 85.2475%           | 337.17             | 79.31             
+  LightGBM         | 85.1485%           | 3775.61            | 2.36              
+  DecisionTree     | 84.8515%           | 5.04               | 0.21              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/NaiveRoute_Report_Music_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/Predictions_Music_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/NaiveRoute_Report_Music_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/Predictions_Music_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/NaiveRoute_Report_Music_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/Predictions_Music_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/NaiveRoute_Report_Music_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Music/SelectModels/naive_smart_route_2/Predictions_Music_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: Reviews | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 390 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 93.6578%           | 1859.46            | 3.15              
+  RandomForest     | 92.3304%           | 500.20             | 68.20             
+  LightGBM         | 90.1180%           | 2603.06            | 2.06              
+  DecisionTree     | 86.1357%           | 5.54               | 0.21              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_Reviews_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/Predictions_Reviews_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_Reviews_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/Predictions_Reviews_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_Reviews_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/Predictions_Reviews_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(2), np.int64(3), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/NaiveRoute_Report_Reviews_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Reviews/SelectModels/naive_smart_route_2/Predictions_Reviews_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: Tiktok | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 490 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 86.3992%           | 1705.71            | 2.36              
+  RandomForest     | 85.3229%           | 362.95             | 136.90            
+  LightGBM         | 84.3444%           | 2884.39            | 1.90              
+  DecisionTree     | 83.6595%           | 7.60               | 0.23              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/NaiveRoute_Report_Tiktok_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/Predictions_Tiktok_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/NaiveRoute_Report_Tiktok_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/Predictions_Tiktok_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/NaiveRoute_Report_Tiktok_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/Predictions_Tiktok_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/NaiveRoute_Report_Tiktok_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/SelectModels/naive_smart_route_2/Predictions_Tiktok_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: VariousImg | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 808 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  LightGBM         | 87.2784%           | 2176.03            | 2.18              
+  XGBoost          | 87.1741%           | 1532.24            | 2.53              
+  RandomForest     | 87.0699%           | 271.29             | 66.13             
+  DecisionTree     | 85.8186%           | 3.75               | 0.23              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/NaiveRoute_Report_VariousImg_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/Predictions_VariousImg_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/NaiveRoute_Report_VariousImg_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/Predictions_VariousImg_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/NaiveRoute_Report_VariousImg_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/Predictions_VariousImg_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(4), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/NaiveRoute_Report_VariousImg_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/SelectModels/naive_smart_route_2/Predictions_VariousImg_DecisionTree.csv
+
+============================================================
+🚀 开始处理数据集: Laion | 模式: 全量输出
+============================================================
+  [Info] 阈值过滤 (Threshold=20.0%): 共剔除 865 个冠亚军差距过小的模糊样本。
+
+[模型全量评测中...]
+  > 跑通: RandomForest   
+  > 跑通: XGBoost        
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+  > 跑通: LightGBM       
+  > 跑通: DecisionTree   
+
+[所有模型性能大比武 (Model Comparison Summary)]
+  算法模型(Model)      | 准确率(Accuracy)    | 训练耗时(Train ms)     | 预测耗时(Pred ms)     
+  ----------------------------------------------------------------------------
+  XGBoost          | 93.1076%           | 37777.68           | 39.14             
+  DecisionTree     | 92.2612%           | 3.44               | 0.20              
+  RandomForest     | 92.0193%           | 763.14             | 192.97            
+  LightGBM         | 91.8984%           | 43433.86           | 7.26              
+
+[导出全部模型的预测及分析结果]
+
+--- 正在落盘模型: RandomForest ---
+--- 正在运行特征消融实验 (基座: RandomForest) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/naive_smart_route_RandomForest.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/NaiveRoute_Report_Laion_RandomForest.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/Predictions_Laion_RandomForest.csv
+
+--- 正在落盘模型: XGBoost ---
+--- 正在运行特征消融实验 (基座: XGBoost) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/naive_smart_route_XGBoost.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/NaiveRoute_Report_Laion_XGBoost.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/Predictions_Laion_XGBoost.csv
+
+--- 正在落盘模型: LightGBM ---
+--- 正在运行特征消融实验 (基座: LightGBM) ---
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/lijiakang/miniconda3/lib/python3.10/site-packages/sklearn/utils/validation.py:2749: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/naive_smart_route_LightGBM.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/NaiveRoute_Report_Laion_LightGBM.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/Predictions_Laion_LightGBM.csv
+
+--- 正在落盘模型: DecisionTree ---
+--- 正在运行特征消融实验 (基座: DecisionTree) ---
+🔧 [ONNX Hack] 成功将底层输出节点硬编码映射为绝对 ID: [np.int64(0), np.int64(5)]
+✅ 成功导出修改完成的 ONNX 模型: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/naive_smart_route_DecisionTree.onnx
+✅ 详尽日志已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/NaiveRoute_Report_Laion_DecisionTree.txt
+✅ 预测明细已生成: /home/fengxiaoyao/FilterVector/FilterVectorResults/Laion/SelectModels/naive_smart_route_2/Predictions_Laion_DecisionTree.csv

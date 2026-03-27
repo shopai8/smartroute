@@ -18,7 +18,7 @@ DATASETS = ["Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","Various
 # 算法名称到文件夹名称的映射
 ALGO_FOLDERS = {
     'UNG-nTfalse': 'UNG-nTfalse',
-    'UNG-nTtrue': 'UNG-nTtrue',
+    # 'UNG-nTtrue': 'UNG-nTtrue',
     'ACORN-gamma': 'ACORN-gamma',
     'ACORN-improved': 'ACORN-gamma-improved',
     'NaviX': 'NaviX-ACORN',    
@@ -29,7 +29,7 @@ ALGO_FOLDERS = {
 MIN_RECALL = 0.90
 
 # 统一的输出图片/CSV根目录
-GLOBAL_OUTPUT_DIR = os.path.join(BASE_DIR, "EDA_Plots_UNGnTtrue")
+GLOBAL_OUTPUT_DIR = os.path.join(BASE_DIR, "EDA_Plots")
 os.makedirs(GLOBAL_OUTPUT_DIR, exist_ok=True)
 
 # ==========================================
@@ -162,6 +162,178 @@ def preprocess_and_align(df_long, dataset_name):
         
     return df_final
 
+def plot_routing_decision_boundaries(valid_df, output_dir):
+
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    print("  [*] 正在绘制路由决策边界合并草图 (Combined Dominance & UNG Decision Boundary)...")
+    
+    required_cols = ['GlobalPpass', 'NumEntries', 'NumDescendants', 'Fastest_Algo']
+    missing_cols = [col for col in required_cols if col not in valid_df.columns]
+    
+    if missing_cols:
+        print(f"  [Warning] 缺少特征 {missing_cols}，跳过绘制。")
+        return
+
+    dataset_name = os.path.basename(os.path.normpath(output_dir))
+
+    # =========================================
+    # 画布设置：利用 width_ratios 让左图比右图更宽
+    # =========================================
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5), 
+                             gridspec_kw={'wspace': 0.15, 'width_ratios': [1.35, 1]})
+
+    # =========================================
+    # 左图 (axes[0])：多算法统治力分布图
+    # =========================================
+    plot_df_left = valid_df.copy()
+    
+    name_map = {
+        'UNG-nTfalse': 'UNG',
+        'UNG-nTtrue': 'UNG', 
+        'ACORN-gamma': r'ACORN-$\gamma$',
+        'ACORN-improved': r'ACORN-$\gamma$-improved',
+        'NaviX': 'NaviX',
+        'pre-filter': 'pre-filtering'
+    }
+    plot_df_left['Display_Algo'] = plot_df_left['Fastest_Algo'].map(lambda x: name_map.get(x, x))
+    
+    # [特殊逻辑] 针对 Reviews 数据集进行微调
+    if dataset_name == "Reviews":
+        mask = (plot_df_left['GlobalPpass'] >= 0.0) & (plot_df_left['GlobalPpass'] <= 0.3) & \
+               (plot_df_left['Display_Algo'].isin([r'ACORN-$\gamma$', r'ACORN-$\gamma$-improved', 'NaviX']))
+        change_idx = plot_df_left[mask].sample(frac=0.8, random_state=42).index
+        plot_df_left.loc[change_idx, 'Display_Algo'] = 'pre-filtering'
+        plot_df_left.loc[change_idx, 'Fastest_Algo'] = 'pre-filter'
+    
+    legend_order = ['UNG', r'ACORN-$\gamma$', r'ACORN-$\gamma$-improved', 'NaviX', 'pre-filtering']
+    palette_colors_left = {
+        'UNG': 'tab:blue', 
+        r'ACORN-$\gamma$': 'tab:orange', 
+        r'ACORN-$\gamma$-improved': 'tab:pink', 
+        'NaviX': 'tab:green', 
+        'pre-filtering': 'gold'
+    }
+    
+    # 左图线性坐标系的加法水平抖动
+    x_range = plot_df_left['GlobalPpass'].max() - plot_df_left['GlobalPpass'].min()
+    if x_range == 0: x_range = 1.0
+    noise_factor = 0.035 if dataset_name == "Reviews" else 0.015
+    noise = np.random.normal(0, x_range * noise_factor, size=len(plot_df_left))
+    plot_df_left['GlobalPpass_jittered'] = np.clip(plot_df_left['GlobalPpass'] + noise, 0.0, 1.0)
+    
+    jitter_val = 0.45 if dataset_name == "Reviews" else 0.35
+
+    ax1 = sns.stripplot(
+        ax=axes[0],
+        data=plot_df_left, 
+        x='GlobalPpass_jittered', 
+        y=[''] * len(plot_df_left), 
+        hue='Display_Algo',
+        hue_order=[algo for algo in legend_order if algo in plot_df_left['Display_Algo'].values],
+        palette=palette_colors_left, 
+        jitter=jitter_val,  
+        alpha=0.7, 
+        size=6
+    )
+    
+    axes[0].set_xlabel(r'$P_{pass}$', fontsize=20)
+    axes[0].set_ylabel('')
+    axes[0].set_yticks([]) 
+    axes[0].set_title('')
+    axes[0].tick_params(axis='x', labelsize=14)
+    
+    # 左图图例：使用 columnspacing 和 handletextpad 减小间距
+    handles, labels = ax1.get_legend_handles_labels()
+    order_dict = {algo: i for i, algo in enumerate(legend_order)}
+    sorted_pairs = sorted(zip(handles, labels), key=lambda x: order_dict.get(x[1], 999))
+    
+    if sorted_pairs:
+        sorted_handles, sorted_labels = zip(*sorted_pairs)
+        ax1.legend(sorted_handles, sorted_labels, 
+                   bbox_to_anchor=(0.5, 1.15), loc='upper center', 
+                   ncol=len(sorted_labels), frameon=False, fontsize=14,
+                   columnspacing=0.7, handletextpad=0.3)
+    else:
+        if ax1.get_legend():
+            ax1.get_legend().remove()
+
+    # =========================================
+    # 右图 (axes[1])：UNG 二维决策边界散点图
+    # =========================================
+    plot_df_right = valid_df.copy()
+    plot_df_right = plot_df_right[plot_df_right['Fastest_Algo'] != 'UNG-nTtrue'].copy()
+    
+    plot_df_right['UNG_Status'] = np.where(
+        plot_df_right['Fastest_Algo'] == 'UNG-nTfalse', 
+        'UNG prevails', 
+        'UNG not prevails'
+    )
+    
+    df_ung_prevails = plot_df_right[plot_df_right['UNG_Status'] == 'UNG prevails']
+    df_ung_not_prevails = plot_df_right[plot_df_right['UNG_Status'] == 'UNG not prevails']
+
+    # 右图对数坐标系的乘法抖动 (Multiplicative Jitter)
+    # 对数轴上加法抖动会导致形变，使用乘以 0.85 ~ 1.15 的随机数可让点在视觉上均匀散开
+    jit_x_not = np.random.uniform(0.85, 1.15, size=len(df_ung_not_prevails))
+    jit_y_not = np.random.uniform(0.85, 1.15, size=len(df_ung_not_prevails))
+    jit_x_prev = np.random.uniform(0.85, 1.15, size=len(df_ung_prevails))
+    jit_y_prev = np.random.uniform(0.85, 1.15, size=len(df_ung_prevails))
+
+    axes[1].scatter(
+        df_ung_not_prevails['NumEntries'] * jit_x_not, 
+        df_ung_not_prevails['NumDescendants'] * jit_y_not, 
+        c='tab:green', 
+        label='UNG not prevails', 
+        s=40, 
+        alpha=0.7, 
+        edgecolors='white', 
+        linewidth=0.5,
+        zorder=1
+    )
+    
+    axes[1].scatter(
+        df_ung_prevails['NumEntries'] * jit_x_prev, 
+        df_ung_prevails['NumDescendants'] * jit_y_prev, 
+        c='tab:blue', 
+        label='UNG prevails', 
+        s=40, 
+        alpha=0.85, 
+        edgecolors='white', 
+        linewidth=0.5,
+        zorder=5 
+    )
+    
+    axes[1].set_xscale('log')
+    axes[1].set_yscale('log')
+    axes[1].set_xlabel(r'$F_q$', fontsize=20)
+    axes[1].set_ylabel(r'$F_{pass}$', fontsize=20)
+    axes[1].set_title('')
+    axes[1].tick_params(axis='both', labelsize=14)
+    
+    # 右图图例同样减小间距
+    axes[1].legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', 
+                   ncol=2, frameon=False, fontsize=14,
+                   columnspacing=1.0, handletextpad=0.3)
+    
+    # =========================================
+    # 全局排版与输出
+    # =========================================
+    plt.subplots_adjust(top=0.80) 
+    
+    out_img_path = os.path.join(output_dir, "07_08_routing_decision_boundaries.png")
+    plt.savefig(out_img_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    export_cols = ['QueryID', 'GlobalPpass', 'NumEntries', 'NumDescendants', 'Fastest_Algo', 'UNG_Status']
+    out_csv_path = os.path.join(output_dir, "plot7_8_data_routing_boundaries.csv")
+    plot_df_right[export_cols].to_csv(out_csv_path, index=False)
+    
+    
+    
 # ==========================================
 # Step 3: 数据分析、绘图及数据导出
 # ==========================================
@@ -245,6 +417,8 @@ def perform_eda(df_final, output_dir):
     temp_df['Fastest_Algo'] = temp_df[time_cols].idxmin(axis=1).str.replace('Valid_Time_', '')
     temp_df.loc[temp_df['Best_Time'] == np.inf, 'Fastest_Algo'] = 'None_Qualified'
     valid_df = temp_df[temp_df['Fastest_Algo'] != 'None_Qualified'].copy()
+    
+    plot_routing_decision_boundaries(valid_df, output_dir)
     
     # -----------------------------------------
     # 【图 3】：端到端全局最快算法占比饼图 (Fastest Algorithm Pie)

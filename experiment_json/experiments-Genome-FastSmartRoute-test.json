@@ -11,10 +11,10 @@
             "alpha": 1.2,
             "num_cross_edges": 6,
             "num_entry_points": 16,
-            "Lsearch_start": 5000,
+            "Lsearch_start": 1000,
             "Lsearch_end":40000,
-            "Lsearch_step": 5000,
-            "num_threads": 60,
+            "Lsearch_step": 1000,
+            "num_threads": 100,
             "K": 10,
             "num_repeats": 1,
             "acorn_params": {
@@ -27,14 +27,14 @@
          },
          "tasks": [
             {
-               "query_dir_name": "query_A_B_C-weighted-sub-base-123456789",
+               "query_dir_name": "query_select_imp_A_B_C-weighted-sub-base-123456789",
                "acorn_search_params": {
                   "acorn_efs_start": 100,
                   "acorn_efs_step_slow": 100,
                   "acorn_efs_step_fast":100
                },
                "algorithms": [
-                  "pre-filter"
+                  "FastSmartRoute"
                ]
             }
          ]
