@@ -426,6 +426,7 @@ namespace ANNS
       std::unique_ptr<MethodSelector> _fast_route_l1_selector;  // FastSmartRoute L1 (3特征)
       std::unique_ptr<MethodSelector> _fast_route_l2_selector;
       int _l1_majority_acorn_id = 2; // 默认兜底为 2 (ACORN-gamma)，以防文件读取失败
+      int _naive_majority_acorn_id = 2; // 用于存储 Naive SmartRoute的 ACORN 家族多数派 ID
       int determine_routing_strategy(
         int routing_mode, 
         int baseline_alg,

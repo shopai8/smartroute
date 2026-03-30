@@ -1019,6 +1019,9 @@
                      {
                         "name":"SmartRoute",
                         "params": {
+                           "lsearch_start": 1000,
+                           "lsearch_end": 40000,
+                           "lsearch_step": 1000,
                            "acorn_efs_start": 100,
                            "acorn_efs_step_slow": 100,
                            "acorn_efs_step_fast": 100
@@ -1117,6 +1120,9 @@
                      {
                         "name": "SmartRoute",
                         "params": {
+                           "lsearch_start": 1000,
+                           "lsearch_end": 40000,
+                           "lsearch_step": 1000,
                            "acorn_efs_start": 100,
                            "acorn_efs_step_slow": 100,
                            "acorn_efs_step_fast": 100
@@ -1268,6 +1274,9 @@
                      {
                         "name": "SmartRoute",
                         "params": {
+                           "lsearch_start": 1000,
+                           "lsearch_end": 40000,
+                           "lsearch_step": 1000,
                            "acorn_efs_start": 200,
                            "acorn_efs_step_slow": 200,
                            "acorn_efs_step_fast": 200
@@ -1435,8 +1444,18 @@
                            "acorn_efs_step_fast": 200
                         }
                      },
+                     {
+                        "name":"SmartRoute",
+                        "params": {
+                           "lsearch_start": 500,
+                           "lsearch_end": 20000,
+                           "lsearch_step": 500,
+                           "acorn_efs_start": 200,
+                           "acorn_efs_step_slow": 200,
+                           "acorn_efs_step_fast": 200
+                        }
+                     },
                      "UNG",
-                     "SmartRoute",
                      "NaviX",
                      "pre-filtering"
                   ]
@@ -1573,8 +1592,18 @@
                            "acorn_efs_step_fast": 10
                         }
                      },
+                     {
+                        "name":"SmartRoute",
+                        "params": {
+                           "lsearch_start": 1000,
+                           "lsearch_end": 40000,
+                           "lsearch_step": 1000,
+                           "acorn_efs_start": 10,
+                           "acorn_efs_step_slow": 10,
+                           "acorn_efs_step_fast": 10
+                        }
+                     },
                      "UNG",
-                     "SmartRoute",
                      "NaviX",
                      "pre-filtering"
                   ]

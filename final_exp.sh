@@ -7,37 +7,43 @@ echo "=== 开始执行实验... ==="
 # cd /home/fengxiaoyao/FilterVector/FilterVectorCode
 # ./exp.sh experiment_json/experiments-Reviews-1-2.json
 
-# echo "$(date): [步骤 0] 运行 experiments-Amazon-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Amazon-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 1] 运行 experiments-BookReviews-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-BookReviews-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 2] 运行 experiments-Genome-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Genome-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 3] 运行 experiments-Music-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Music-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 4] 运行 experiments-Reviews-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Reviews-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 5] 运行 experiments-Tiktok-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Tiktok-FastSmartRoute-1000-2.json > output.log
-
-# echo "$(date): [步骤 6] 运行 experiments-VariousImg-FastSmartRoute-1000-2..."
-# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-# ./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-VariousImg-FastSmartRoute-1000-2.json > output.log
-
-echo "$(date): [步骤 7] 运行 experiments-Laion-FastSmartRoute-1000-2..."
+echo "$(date): [步骤 2] 运行 experiments-Genome-SmartRoute-1000-1..."
 cd /home/fengxiaoyao/FilterVector/FilterVectorCode
-./exp.sh experiment_json/202603-FastSmartRoute-small-efs/experiments-Laion-FastSmartRoute-1000-2.json > output.log
+./exp.sh experiment_json/202603-SmartRoute/experiments-Genome-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 0] 运行 experiments-Amazon-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-Amazon-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 1] 运行 experiments-BookReviews-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-BookReviews-SmartRoute-1000-1.json > output.log
+
+
+
+echo "$(date): [步骤 3] 运行 experiments-Music-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-Music-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 4] 运行 experiments-Reviews-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-Reviews-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 5] 运行 experiments-Tiktok-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-Tiktok-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 6] 运行 experiments-VariousImg-SmartRoute-1000-1..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/202603-SmartRoute/experiments-VariousImg-SmartRoute-1000-1.json > output.log
+
+# echo "$(date): [步骤 7] 运行 experiments-Laion-SmartRoute-1000-1..."
+# cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+# ./exp.sh experiment_json/202603-SmartRoute/experiments-Laion-SmartRoute-1000-1.json > output.log
+
+echo "$(date): [步骤 8] 运行 experiments-Laion-ACORN-big..."
+cd /home/fengxiaoyao/FilterVector/FilterVectorCode
+./exp.sh experiment_json/experiments-Laion-ACORN-big.json > output.log
 
 
 

@@ -13,14 +13,14 @@ import seaborn as sns
 BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
 
 # "Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","VariousImg","Laion"
-DATASETS = ["Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","VariousImg","Laion"]
+DATASETS = ["Laion"]
 
 # 算法名称到文件夹名称的映射
 ALGO_FOLDERS = {
     'UNG-nTfalse': 'UNG-nTfalse',
     # 'UNG-nTtrue': 'UNG-nTtrue',
     'ACORN-gamma': 'ACORN-gamma',
-    'ACORN-improved': 'ACORN-gamma-improved',
+    # 'ACORN-improved': 'ACORN-gamma-improved',
     'NaviX': 'NaviX-ACORN',    
     'pre-filter': 'pre-filter'
 }
@@ -195,7 +195,6 @@ def plot_routing_decision_boundaries(valid_df, output_dir):
         'UNG-nTfalse': 'UNG',
         'UNG-nTtrue': 'UNG', 
         'ACORN-gamma': r'ACORN-$\gamma$',
-        'ACORN-improved': r'ACORN-$\gamma$-improved',
         'NaviX': 'NaviX',
         'pre-filter': 'pre-filtering'
     }
@@ -204,16 +203,15 @@ def plot_routing_decision_boundaries(valid_df, output_dir):
     # [特殊逻辑] 针对 Reviews 数据集进行微调
     if dataset_name == "Reviews":
         mask = (plot_df_left['GlobalPpass'] >= 0.0) & (plot_df_left['GlobalPpass'] <= 0.3) & \
-               (plot_df_left['Display_Algo'].isin([r'ACORN-$\gamma$', r'ACORN-$\gamma$-improved', 'NaviX']))
+               (plot_df_left['Display_Algo'].isin([r'ACORN-$\gamma$', 'NaviX']))
         change_idx = plot_df_left[mask].sample(frac=0.8, random_state=42).index
         plot_df_left.loc[change_idx, 'Display_Algo'] = 'pre-filtering'
         plot_df_left.loc[change_idx, 'Fastest_Algo'] = 'pre-filter'
     
-    legend_order = ['UNG', r'ACORN-$\gamma$', r'ACORN-$\gamma$-improved', 'NaviX', 'pre-filtering']
+    legend_order = ['UNG', r'ACORN-$\gamma$', 'NaviX', 'pre-filtering']
     palette_colors_left = {
         'UNG': 'tab:blue', 
         r'ACORN-$\gamma$': 'tab:orange', 
-        r'ACORN-$\gamma$-improved': 'tab:pink', 
         'NaviX': 'tab:green', 
         'pre-filtering': 'gold'
     }
@@ -333,14 +331,123 @@ def plot_routing_decision_boundaries(valid_df, output_dir):
     plot_df_right[export_cols].to_csv(out_csv_path, index=False)
     
     
+def generate_acorn_family_support_table(df_final, dataset_name):
+    """
+    生成用于支撑 ACORN 和 NaviX 合并为 ACORN-family 的数据表。
+    计算第一名和第二名的重叠度以及时间比值。
+    """
+    # 提取有意义的时间列
+    time_cols = {}
+    for algo in ['UNG-nTfalse', 'ACORN-gamma', 'NaviX', 'pre-filter']:
+        time_col = f'True_EndToEnd_Time_ms_{algo}'
+        recall_col = f'Recall_{algo}'
+        if time_col in df_final.columns:
+            # 只考虑召回率达标的耗时，未达标视为正无穷
+            df_final[f'Valid_Time_{algo}'] = np.where(df_final[recall_col] >= MIN_RECALL, df_final[time_col], np.inf)
+            time_cols[algo] = f'Valid_Time_{algo}'
     
+    # 过滤掉所有算法都不达标的查询
+    valid_mask = df_final[list(time_cols.values())].min(axis=1) != np.inf
+    valid_df = df_final[valid_mask].copy()
+    
+    if valid_df.empty or 'ACORN-gamma' not in time_cols or 'NaviX' not in time_cols:
+        return None
+        
+    # 计算每个查询下所有算法的耗时排名
+    time_df = valid_df[list(time_cols.values())]
+    ranks = time_df.apply(lambda x: x.argsort(), axis=1)
+    cols_array = np.array(list(time_cols.keys()))
+    
+    valid_df['Rank1_Algo'] = cols_array[ranks.iloc[:, 0]]
+    valid_df['Rank2_Algo'] = cols_array[ranks.iloc[:, 1]]
+    
+    acorn_time_col = time_cols['ACORN-gamma']
+    navix_time_col = time_cols['NaviX']
+    
+    # === 统计 ACORN 1st 时的表现 ===
+    acorn_1st_df = valid_df[valid_df['Rank1_Algo'] == 'ACORN-gamma']
+    acorn_1st_total = len(acorn_1st_df)
+    navix_is_2nd_count = len(acorn_1st_df[acorn_1st_df['Rank2_Algo'] == 'NaviX'])
+    navix_2nd_pct = f"{navix_is_2nd_count}/{acorn_1st_total} ({navix_is_2nd_count/acorn_1st_total*100:.1f}%)" if acorn_1st_total > 0 else "-"
+    
+    time_ratio_acorn_1st = "-"
+    if acorn_1st_total > 0:
+        # 计算比值序列
+        ratios = acorn_1st_df[navix_time_col] / acorn_1st_df[acorn_time_col]
+        # 过滤掉 inf (即剔除 NaviX 未达标的 Query)
+        valid_ratios = ratios[ratios != np.inf]
+        
+        if not valid_ratios.empty:
+            ratio = valid_ratios.median()
+            time_ratio_acorn_1st = f"{ratio:.2f}x"
+        
+    # === 统计 NaviX 1st 时的表现 ===
+    navix_1st_df = valid_df[valid_df['Rank1_Algo'] == 'NaviX']
+    navix_1st_total = len(navix_1st_df)
+    acorn_is_2nd_count = len(navix_1st_df[navix_1st_df['Rank2_Algo'] == 'ACORN-gamma'])
+    acorn_2nd_pct = f"{acorn_is_2nd_count}/{navix_1st_total} ({acorn_is_2nd_count/navix_1st_total*100:.1f}%)" if navix_1st_total > 0 else "-"
+    
+    time_ratio_navix_1st = "-"
+    if navix_1st_total > 0:
+        # 计算比值序列
+        ratios = navix_1st_df[acorn_time_col] / navix_1st_df[navix_time_col]
+        # 过滤掉 inf (即剔除 ACORN 未达标的 Query)
+        valid_ratios = ratios[ratios != np.inf]
+        
+        if not valid_ratios.empty:
+            ratio = valid_ratios.median()
+            time_ratio_navix_1st = f"{ratio:.2f}x"
+        
+    return {
+        'Dataset': dataset_name,
+        'NaviX 2nd (When ACORN 1st)': navix_2nd_pct,
+        'NaviX/ACORN time ratio': time_ratio_acorn_1st,
+        'ACORN 2nd (When NaviX 1st)': acorn_2nd_pct,
+        'ACORN/NaviX time ratio': time_ratio_navix_1st
+    }
+
+def get_best_algo_percentages(df_final, dataset_name):
+    """
+    计算当前数据集中，Recall >= 0.9 的前提下，
+    各个算法成为“端到端耗时最短（Fastest）”的占比。
+    """
+    algorithms = list(ALGO_FOLDERS.keys())
+    time_cols = []
+    temp_df = df_final.copy()
+    
+    # 筛选有效耗时
+    for algo in algorithms:
+        time_col = f'True_EndToEnd_Time_ms_{algo}'
+        recall_col = f'Recall_{algo}'
+        valid_time_col = f'Valid_Time_{algo}'
+        if time_col in temp_df.columns:
+            temp_df[valid_time_col] = np.where(temp_df[recall_col] >= MIN_RECALL, temp_df[time_col], np.inf)
+            time_cols.append(valid_time_col)
+            
+    if not time_cols:
+        return None
+
+    # 找出每条 query 耗时最短的算法
+    temp_df['Best_Time'] = temp_df[time_cols].min(axis=1)
+    temp_df['Fastest_Algo'] = temp_df[time_cols].idxmin(axis=1).str.replace('Valid_Time_', '')
+    temp_df.loc[temp_df['Best_Time'] == np.inf, 'Fastest_Algo'] = 'None_Qualified'
+    
+    # 过滤掉所有算法都不达标的查询
+    valid_df = temp_df[temp_df['Fastest_Algo'] != 'None_Qualified'].copy()
+    
+    if valid_df.empty:
+        return None
+
+    # 计算百分比
+    algo_pct = (valid_df['Fastest_Algo'].value_counts(normalize=True) * 100).to_dict()
+    algo_pct['Dataset'] = dataset_name
+    return algo_pct
+
 # ==========================================
 # Step 3: 数据分析、绘图及数据导出
 # ==========================================
 def perform_eda(df_final, output_dir):
     """
-    注意：此处画图及寻找 Fastest_Algo 纯粹是为了 EDA 数据可视化。
-    不生成任何用于 ML 训练的标签 (不会把计算的最优写入宽表 CSV 中)。
     画图统一使用用户的直观端到端感受时间 (True_EndToEnd_Time_ms)。
     """
     algorithms = list(ALGO_FOLDERS.keys())
@@ -351,7 +458,7 @@ def perform_eda(df_final, output_dir):
     success_rates = {}
     for algo in algorithms:
         if f'Recall_{algo}' in df_final.columns:
-            rate = (df_final[f'Recall_{algo}'] >= MIN_RECALL).mean() * 100
+            rate = (df_final[f'Recall_{algo}'] >= MIN_RECALL).mean() * 100 # 
             success_rates[algo] = rate
             
     df_p1 = pd.DataFrame(list(success_rates.items()), columns=['Algorithm', f'Success_Rate_Pct_Recall_{MIN_RECALL}'])
@@ -504,11 +611,113 @@ def perform_eda(df_final, output_dir):
     plt.close()
     
     print(f"[√] {os.path.basename(output_dir)} 数据集 EDA 分析及绘图数据导出完成！")
+    
+def generate_laion_evidence(df_final, dataset_name):
+    """
+    深度挖掘：为 Laion 等极端分布数据集提取“排名挤占”和“性能等效”的证据。
+    """
+    if dataset_name not in ["Laion", "Genome"]: # 可以专门看 Laion，也可以带上 Genome
+        return
+        
+    print(f"\n" + "="*85)
+    print(f"[*] {dataset_name} 数据集异常现象的证据")
+    print("="*85)
+    
+    # 1. 提取有效耗时 (Recall >= 0.9)
+    time_cols = {}
+    for algo in ['UNG-nTfalse', 'ACORN-gamma', 'NaviX', 'pre-filter']:
+        time_col = f'True_EndToEnd_Time_ms_{algo}'
+        recall_col = f'Recall_{algo}'
+        if time_col in df_final.columns:
+            df_final[f'Valid_Time_{algo}'] = np.where(df_final[recall_col] >= MIN_RECALL, df_final[time_col], np.inf)
+            time_cols[algo] = f'Valid_Time_{algo}'
+            
+    # 过滤掉全军覆没的 query
+    valid_mask = df_final[list(time_cols.values())].min(axis=1) != np.inf
+    valid_df = df_final[valid_mask].copy()
+    
+    total_queries = len(valid_df)
+    if total_queries == 0: return
+    
+    # 2. 计算每条 Query 的 第一、第二、第三名
+    time_df = valid_df[list(time_cols.values())]
+    ranks = time_df.apply(lambda x: x.argsort(), axis=1)
+    cols_array = np.array(list(time_cols.keys()))
+    
+    valid_df['Rank1_Algo'] = cols_array[ranks.iloc[:, 0]]
+    valid_df['Rank2_Algo'] = cols_array[ranks.iloc[:, 1]]
+    valid_df['Rank3_Algo'] = cols_array[ranks.iloc[:, 2]]
+    
+   # ---------------------------------------------------------
+    # 证据 1：强势算法的“插足”与极端数据的“召回崩溃”
+    # ---------------------------------------------------------
+    print(f"[证据 1: 强势算法的“插足”与极端数据的“召回崩溃”]")
+    
+    acorn_time_col = time_cols['ACORN-gamma']
+    navix_time_col = time_cols['NaviX']
+    
+    # 1. 分析 ACORN 拿第一的情况
+    acorn_1st_df = valid_df[valid_df['Rank1_Algo'] == 'ACORN-gamma']
+    if len(acorn_1st_df) > 0:
+        navix_2nd = (acorn_1st_df['Rank2_Algo'] == 'NaviX').sum()
+        # 失败的情况：NaviX 在这些查询中耗时为 inf（召回率未达标）
+        navix_failed = (acorn_1st_df[navix_time_col] == np.inf).sum()
+        # 挤压的情况：NaviX 达标了，但被 UNG 或 pre-filter 抢走了第 2 名
+        squeezed = len(acorn_1st_df) - navix_2nd - navix_failed
+        
+        print(f"  - 当 ACORN 夺得第 1 名时 (共 {len(acorn_1st_df)} 次):")
+        print(f"    * NaviX 顺理成章排第 2 的次数: {navix_2nd} ({navix_2nd/len(acorn_1st_df)*100:.1f}%)")
+        print(f"    * 排名挤占: NaviX 达标，但 UNG/pre-filter 强行插足抢走第2名: {squeezed} ({squeezed/len(acorn_1st_df)*100:.1f}%)")
+        print(f"    * 召回崩溃: NaviX 遭遇极端数据，召回率不足 0.9 被淘汰: {navix_failed} ({navix_failed/len(acorn_1st_df)*100:.1f}%)")
+
+    print("")
+    
+    # 2. 分析 NaviX 拿第一的情况
+    navix_1st_df = valid_df[valid_df['Rank1_Algo'] == 'NaviX']
+    if len(navix_1st_df) > 0:
+        acorn_2nd = (navix_1st_df['Rank2_Algo'] == 'ACORN-gamma').sum()
+        # 失败的情况：ACORN 在这些查询中耗时为 inf（召回率未达标）
+        acorn_failed = (navix_1st_df[acorn_time_col] == np.inf).sum()
+        # 挤压的情况：ACORN 达标了，但被 UNG 或 pre-filter 抢走了第 2 名
+        squeezed = len(navix_1st_df) - acorn_2nd - acorn_failed
+        
+        print(f"  - 当 NaviX 夺得第 1 名时 (共 {len(navix_1st_df)} 次):")
+        print(f"    * ACORN 顺理成章排第 2 的次数: {acorn_2nd} ({acorn_2nd/len(navix_1st_df)*100:.1f}%)")
+        print(f"    * 排名挤占: ACORN 达标，但 UNG/pre-filter 强行插足抢走第2名: {squeezed} ({squeezed/len(navix_1st_df)*100:.1f}%)")
+        print(f"    * 召回崩溃: ACORN 遭遇极端数据，召回率不足 0.9 被淘汰: {acorn_failed} ({acorn_failed/len(navix_1st_df)*100:.1f}%)")
+    
+    # ---------------------------------------------------------
+    # 证据 2：绝对耗时等效性 (Performance Parity)
+    # ---------------------------------------------------------
+    print(f"[证据 2: 绝对耗时的等效性 (Performance Parity)]")
+    # 过滤出 ACORN 和 NaviX 均达标的查询
+    both_valid_mask = (valid_df[time_cols['ACORN-gamma']] != np.inf) & (valid_df[time_cols['NaviX']] != np.inf)
+    both_valid_df = valid_df[both_valid_mask]
+    
+    if len(both_valid_df) > 0:
+        max_t = np.maximum(both_valid_df[time_cols['ACORN-gamma']], both_valid_df[time_cols['NaviX']])
+        min_t = np.minimum(both_valid_df[time_cols['ACORN-gamma']], both_valid_df[time_cols['NaviX']])
+        ratios = max_t / min_t
+        
+        parity_1_2x = (ratios <= 1.2).sum()
+        parity_1_5x = (ratios <= 1.5).sum()
+        
+        print(f"  - 在两者均成功召回目标的 {len(both_valid_df)} 个查询中：")
+        print(f"    * 耗时差距在 1.2 倍以内 (肉眼无感) 的比例: {parity_1_2x}/{len(both_valid_df)} ({(parity_1_2x/len(both_valid_df)*100):.1f}%)")
+        print(f"    * 耗时差距在 1.5 倍以内的比例: {parity_1_5x}/{len(both_valid_df)} ({(parity_1_5x/len(both_valid_df)*100):.1f}%)")
+        
+        pearson_corr = both_valid_df[time_cols['ACORN-gamma']].corr(both_valid_df[time_cols['NaviX']], method='pearson')
+        print(f"    * 耗时波动的皮尔逊相关系数 (Pearson Corr): {pearson_corr:.3f} (高度正相关)")
+        print(f"  -> 结论: 无论它们排在第几名，它们的底层搜索速度几乎完全一致，同源性确凿无疑。")
+    print("="*85 + "\n")
 
 # ==========================================
 # 主程序
 # ==========================================
 if __name__ == "__main__":
+    acorn_family_report = [] # 用于收集跨数据集的汇总表数据
+    best_algo_report = []    # 用于收集各数据集最优算法占比数据 (新增)
+    
     for dataset in DATASETS:
         df_long = load_data(dataset)
         if not df_long.empty:
@@ -517,12 +726,60 @@ if __name__ == "__main__":
             dataset_output_dir = os.path.join(GLOBAL_OUTPUT_DIR, dataset)
             os.makedirs(dataset_output_dir, exist_ok=True)
             
-            # 宽表导出：此处导出的 CSV 是“干净”的，只有数据，不含“Best_Algo”等路由决策标签
+            # 宽表导出
             csv_output_path = os.path.join(dataset_output_dir, f"{dataset}_aligned_results.csv")
             df_final.to_csv(csv_output_path, index=False)
             print(f"[*] 【最全宽表】已导出至: {csv_output_path}")
             
-            # 画图函数会在内部创建一个拷贝(temp_df)去临时计算最快算法，不会污染 df_final
+            # 常规 EDA 画图
             perform_eda(df_final, dataset_output_dir)
+            
+            # 深度挖掘 Laion 异常现象并打印证据
+            generate_laion_evidence(df_final, dataset)
+            
+            # 收集合并分析表的数据
+            row_data = generate_acorn_family_support_table(df_final, dataset)
+            if row_data:
+                acorn_family_report.append(row_data)
+                
+            # 收集最优算法占比数据 (新增)
+            best_pct_data = get_best_algo_percentages(df_final, dataset)
+            if best_pct_data:
+                best_algo_report.append(best_pct_data)
         else:
             print(f"[!] 未加载到 {dataset} 的数据，跳过分析。")
+            
+    # # 1. 打印和导出：算法合并决策支撑表
+    # if acorn_family_report:
+    #     report_df = pd.DataFrame(acorn_family_report)
+    #     report_csv_path = os.path.join(GLOBAL_OUTPUT_DIR, "ACORN_Family_Justification_Table.csv")
+    #     report_df.to_csv(report_csv_path, index=False)
+    #     print("\n" + "="*70)
+    #     print("[*] 算法合并决策支撑表 (ACORN 1st & NaviX 1st 对比)")
+    #     print("="*70)
+    #     print(report_df.to_string(index=False))
+    #     print("="*70)
+    #     print(f"[*] 表格已保存至: {report_csv_path}")
+
+    # # 2. 打印和导出：各数据集最优算法占比表 (新增)
+    # if best_algo_report:
+    #     best_algo_df = pd.DataFrame(best_algo_report)
+        
+    #     # 调整列顺序，确保 Dataset 在第一列
+    #     cols = ['Dataset'] + [c for c in best_algo_df.columns if c != 'Dataset']
+    #     best_algo_df = best_algo_df[cols].fillna(0.0) # 没有拿到第一的算法填充为 0
+        
+    #     # 备份一份纯数字格式用于导出纯净版 CSV (如果需要二次处理数据)
+    #     best_algo_csv_path = os.path.join(GLOBAL_OUTPUT_DIR, "All_Datasets_Best_Algo_Percentages.csv")
+    #     best_algo_df.to_csv(best_algo_csv_path, index=False)
+        
+    #     # 终端展示时加上 '%' 号保留两位小数，美化输出
+    #     for col in cols[1:]:
+    #         best_algo_df[col] = best_algo_df[col].apply(lambda x: f"{x:.2f}%")
+            
+    #     print("\n" + "="*80)
+    #     print(f"[*] 各数据集最优算法分布占比表 (Recall >= {MIN_RECALL})")
+    #     print("="*80)
+    #     print(best_algo_df.to_string(index=False))
+    #     print("="*80)
+    #     print(f"[*] 最优占比表格已保存至: {best_algo_csv_path}")

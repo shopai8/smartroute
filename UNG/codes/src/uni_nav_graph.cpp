@@ -2539,9 +2539,9 @@ namespace ANNS
 
       if (_smart_route_selector) {
          std::cout << "- Warming up Smart Route Selector..." << std::endl;
-         std::vector<float> dummy5(5, 0.0f);
+         std::vector<float> dummy3(3, 0.0f); 
 #pragma omp parallel for num_threads(num_threads)
-         for (int i = 0; i < num_threads; ++i) _smart_route_selector->predict(dummy5);
+         for (int i = 0; i < num_threads; ++i) _smart_route_selector->predict(dummy3);
       }
       
       if (_fast_route_l1_selector) {
@@ -2841,15 +2841,26 @@ void UniNavGraph::calculate_query_features_only(
          auto pred_start = std::chrono::high_resolution_clock::now();
          int final_alg = 0; // 默认 UNG-nTfalse
          if (_smart_route_selector) {
-               std::vector<float> features = {f_qsize, f_cand, f_ppass, static_cast<float>(stats.num_entry_points), static_cast<float>(stats.num_lng_descendants)};
+               // 严格对齐 Python 里的 3 个特征顺序 (GlobalPpass, NumEntries, NumDescendants)
+               std::vector<float> features = {f_ppass, static_cast<float>(stats.num_entry_points), static_cast<float>(stats.num_lng_descendants)};
+               
                float pred_val = _smart_route_selector->predict(features);
-               final_alg = static_cast<int>(std::round(pred_val));
+               int pred_class = static_cast<int>(std::round(pred_val));
+               
+               // Target Map 映射
+               // Python 端定义为: {'UNG-nTfalse': 0, 'pre-filter': 1, 'ACORN-family': 2}
+               if (pred_class == 0) {
+                   final_alg = 0; // 执行 UNG-nTfalse
+               } else if (pred_class == 1) {
+                   final_alg = 5; // 执行 pre-filter
+               } else if (pred_class == 2) {
+                   final_alg = _naive_majority_acorn_id; // 执行 ACORN-family (动态解析为 ACORN 或 NaviX)
+               }
          }
          stats.route_pred_time_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - pred_start).count();
          return final_alg;
       }
 
-      // --- 模式 2: FastSmartRoute ---
       // --- 模式 2: FastSmartRoute ---
       if (routing_mode == 2) {
          auto l1_start = std::chrono::high_resolution_clock::now();
@@ -3890,11 +3901,23 @@ void UniNavGraph::calculate_query_features_only(
          _trie_method_selector = nullptr;
       }
 
-      // --- 加载 SmartRoute 模型 (5特征) ---
+      // --- 加载 SmartRoute 模型 (3特征, 3分类) ---
       std::string sr_model_path = selector_modle_prefix + "/naive_smart_route/naive_smart_route.onnx";
       if (fs::exists(sr_model_path)) {
          _smart_route_selector = std::make_unique<MethodSelector>(sr_model_path);
          std::cout << "- SmartRoute Model loaded." << std::endl;
+
+         // 加载 naive_majority_acorn_id.txt
+         std::string naive_majority_id_path = selector_modle_prefix + "/naive_smart_route/naive_majority_acorn_id.txt";
+         if (fs::exists(naive_majority_id_path)) {
+             std::ifstream infile(naive_majority_id_path);
+             if (infile >> _naive_majority_acorn_id) {
+                 std::cout << "- SmartRoute majority ACORN ID loaded: " << _naive_majority_acorn_id << std::endl;
+             }
+         } else {
+             std::cout << "- [Warning] naive_majority_acorn_id.txt not found, using default: " << _naive_majority_acorn_id << std::endl;
+         }
+
       } else {
          _smart_route_selector = nullptr;
       }
