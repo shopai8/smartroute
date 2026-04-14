@@ -3,8 +3,8 @@
       {
          "dataset_name": "Amazon",
          "shared_config": {
-            "data_dir": "/home/fengxiaoyao/FilterVector/FilterVectorData/Amazon",
-            "output_dir": "/home/fengxiaoyao/FilterVector/FilterVectorResults/",
+            "data_dir": "/mnt/disk1/syh/ljk/FilterVector/FilterVectorData/Amazon",
+            "output_dir": "/mnt/disk1/syh/ljk/FilterVector/FilterVectorResults/",
             "build_mode": "serial",
             "max_degree": 32,
             "Lbuild": 100,
@@ -34,7 +34,7 @@
                   "acorn_efs_step_fast":200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                 "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -45,7 +45,7 @@
                   "acorn_efs_step_fast":200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -56,7 +56,7 @@
                   "acorn_efs_step_fast":200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -67,7 +67,7 @@
                   "acorn_efs_step_fast":200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -78,7 +78,7 @@
                   "acorn_efs_step_fast":200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             }
          ]

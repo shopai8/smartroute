@@ -16,8 +16,8 @@ public:
     float predict(const std::vector<float>& features);
 
 private:
-    Ort::Env _env;
-    Ort::Session _session;
+    // 移除 Ort::Env _env; 改为使用静态方法获取全局单例
+    Ort::Session _session{nullptr};
     Ort::AllocatorWithDefaultOptions _allocator;
     
     std::vector<const char*> _input_node_names;
@@ -26,4 +26,7 @@ private:
 
     std::string _input_name_str;
     std::string _output_name_str;
+
+    // 获取全局共享的 ONNX Runtime 环境
+    static Ort::Env& get_shared_env();
 };

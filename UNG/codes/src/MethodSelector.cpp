@@ -1,19 +1,30 @@
 #include "include/MethodSelector.h"
 #include <iostream>
 #include <stdexcept>
+#include <mutex>
+
+// 使用局部静态变量实现线程安全的单例 Env。无论实例化多少个 MethodSelector 模型（L1, L2, SmartRoute 等），整个进程都只会初始化一次 ONNX 环境，共用底层的线程池。
+Ort::Env& MethodSelector::get_shared_env() {
+    // 设置日志级别为 WARNING，避免输出过多无用信息
+    static Ort::Env shared_env(ORT_LOGGING_LEVEL_WARNING, "GlobalONNXEnv");
+    return shared_env;
+}
 
 MethodSelector::MethodSelector(const std::string &model_path)
-    : _env(ORT_LOGGING_LEVEL_WARNING, "MethodSelector"),
-      _session(nullptr)
+    : _session(nullptr)
 {
    Ort::SessionOptions session_options;
-   session_options.SetIntraOpNumThreads(1);
+   
+   // 严格限制所有维度的并发线程数为 1
+   session_options.SetIntraOpNumThreads(1); // 限制算子内（如矩阵乘法）单线程
+   session_options.SetInterOpNumThreads(1); // 限制算子间（独立的计算分支）单线程
    session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-   std::cout << "  - [Selector] Initializing ONNX Runtime session..." << std::endl;
+   std::cout << "  - [Selector] Initializing ONNX Runtime session for: " << model_path << std::endl;
    try
    {
-      _session = Ort::Session(_env, model_path.c_str(), session_options);
+      // 传入全局共享的 Env 实例
+      _session = Ort::Session(get_shared_env(), model_path.c_str(), session_options);
    }
    catch (const Ort::Exception &e)
    {
@@ -39,7 +50,6 @@ MethodSelector::MethodSelector(const std::string &model_path)
    }
 }
 
-// 【修改点】返回值改为 float
 float MethodSelector::predict(const std::vector<float> &features)
 {
    if (features.size() != _input_node_dims[1])
@@ -73,7 +83,7 @@ float MethodSelector::predict(const std::vector<float> &features)
    if (type_info == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
        int64_t* pred_ptr = output_tensor.GetTensorMutableData<int64_t>();
        final_prediction = static_cast<float>(pred_ptr[0]);
-   } else if (type_info == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
+   } else if (type_info == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
        float* pred_ptr = output_tensor.GetTensorMutableData<float>();
        final_prediction = pred_ptr[0];
    } else {

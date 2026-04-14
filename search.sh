@@ -92,10 +92,22 @@ echo "结果将保存到: $RESULT_OUTPUT_DIR"
     --scenario containment \
     --num_entry_points "$NUM_ENTRY_POINTS" \
     --Lsearch $LSEARCH_VALUES \
+    --algo_choice_csv "/mnt/disk1/syh/ljk/FilterVector/FilterVectorData/Reviews/query_select_imp_A_B_C-sub-base-repeat_100_2/algo_choice_repeat.csv" \
     --lsearch_start "$LSEARCH_START" \
     --lsearch_step "$LSEARCH_STEP" \
     --efs_start "$EFS_START" \
     --efs_step_slow "$EFS_STEP_SLOW" --efs_step_fast "$EFS_STEP_FAST" --lsearch_threshold "$LSEARCH_THRESHOLD" \
     --navix_index_path "$INDEX_PATH/navix_output/hnsw_base.index" > "$RESULT_OUTPUT_DIR/others/${DATASET}_search_output.txt" 2>&1
 
-echo "搜索完成！"
+# --- Step 7: 后处理，计算各指标全局平均值 ---
+echo "正在计算所有 Query 指标的全局平均值..."
+DETAILS_CSV="${RESULT_OUTPUT_DIR}/results/query_details_repeat${NUM_REPEATS}.csv"
+AVERAGE_CSV="${RESULT_OUTPUT_DIR}/results/query_details_global_average.csv"
+
+if [ -f "$DETAILS_CSV" ]; then
+    python3 UNG/data/average_query_details.py --input_csv "$DETAILS_CSV" --output_csv "$AVERAGE_CSV"
+else
+    echo "⚠️ 未找到明细文件 $DETAILS_CSV，跳过平均值计算。"
+fi
+
+echo "所有搜索和统计任务已全部结束！"

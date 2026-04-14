@@ -1,0 +1,72 @@
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/usr/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:12 (find_program)"
+      - "CMakeLists.txt:16 (project)"
+    mode: "program"
+    variable: "CMAKE_UNAME"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "uname"
+    candidate_directories:
+      - "/home/sunyahui/.codex/tmp/arg0/codex-arg0ZBa5MR/"
+      - "/home/sunyahui/.vscode-server/bin/c9d77990917f3102ada88be140d28b038d1dd7c7/bin/remote-cli/"
+      - "/home/sunyahui/miniconda3/bin/"
+      - "/home/sunyahui/miniconda3/condabin/"
+      - "/usr/local/cuda-12.6/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/local/bin/"
+      - "/usr/sbin/"
+      - "/usr/bin/"
+      - "/sbin/"
+      - "/bin/"
+      - "/usr/games/"
+      - "/usr/local/games/"
+      - "/snap/bin/"
+      - "/home/sunyahui/.vscode-server/extensions/openai.chatgpt-26.325.31654/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/sunyahui/.codex/tmp/arg0/codex-arg0ZBa5MR/uname"
+      - "/home/sunyahui/.vscode-server/bin/c9d77990917f3102ada88be140d28b038d1dd7c7/bin/remote-cli/uname"
+      - "/home/sunyahui/miniconda3/bin/uname"
+      - "/home/sunyahui/miniconda3/condabin/uname"
+      - "/usr/local/cuda-12.6/bin/uname"
+      - "/usr/local/sbin/uname"
+      - "/usr/local/bin/uname"
+      - "/usr/sbin/uname"
+    found: "/usr/bin/uname"
+    search_context:
+      ENV{PATH}:
+        - "/home/sunyahui/.codex/tmp/arg0/codex-arg0ZBa5MR"
+        - "/home/sunyahui/.vscode-server/bin/c9d77990917f3102ada88be140d28b038d1dd7c7/bin/remote-cli"
+        - "/home/sunyahui/miniconda3/bin"
+        - "/home/sunyahui/miniconda3/condabin"
+        - "/usr/local/cuda-12.6/bin"
+        - "/usr/local/sbin"
+        - "/usr/local/bin"
+        - "/usr/sbin"
+        - "/usr/bin"
+        - "/sbin"
+        - "/bin"
+        - "/usr/games"
+        - "/usr/local/games"
+        - "/snap/bin"
+        - "/home/sunyahui/.vscode-server/extensions/openai.chatgpt-26.325.31654/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:212 (message)"
+      - "CMakeLists.txt:16 (project)"
+    message: |
+      The system is: Linux - 6.14.0-37-generic - x86_64
+...

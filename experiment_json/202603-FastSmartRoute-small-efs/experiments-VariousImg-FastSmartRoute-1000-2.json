@@ -34,7 +34,7 @@
                   "acorn_efs_step_fast": 200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -45,7 +45,7 @@
                   "acorn_efs_step_fast": 200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -56,7 +56,7 @@
                   "acorn_efs_step_fast": 200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -67,7 +67,7 @@
                   "acorn_efs_step_fast": 200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             },
             {
@@ -78,7 +78,7 @@
                   "acorn_efs_step_fast": 200
                },
                "algorithms": [
-                  "FastSmartRoute"
+                  "FastSmartRoute","FastSmartRoute+"
                ]
             }
          ]

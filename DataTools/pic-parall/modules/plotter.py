@@ -77,10 +77,10 @@ def generate_qps_recall_grid(all_plot_items, main_title, output_filename, font_s
         "UNG": "tab:blue",
         "ACORN-1": "tab:purple",
         "ACORN-γ": "tab:orange",
-        "ACORN-γ-improved": "tab:pink",
+        "ACORN-γ-improved": "tab:gray",
         "pre-filtering": "gold",  
         "NaviX": "tab:green",          
-        "SmartRoute": "tab:gray",
+        "SmartRoute": "tab:pink",
         "FastSmartRoute": "tab:red",
         # "ImprovedUNG": "tab:cyan",
     }

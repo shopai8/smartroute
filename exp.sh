@@ -123,6 +123,7 @@ cat "$CONFIG_FILE" | jq -c '.experiments[]' | while read -r dataset_config; do
                 "NaviX")          ROUTING_MODE=0; BASELINE_ALG=7 ; IS_REC_MORE_START=false;;
                 "SmartRoute")     ROUTING_MODE=1; BASELINE_ALG=-1 ; IS_REC_MORE_START=true;; 
                 "FastSmartRoute") ROUTING_MODE=2; BASELINE_ALG=-1 ; IS_REC_MORE_START=true;; 
+                "FastSmartRoute+") ROUTING_MODE=3; BASELINE_ALG=-1 ; IS_REC_MORE_START=true;;
                 *)
                     echo "错误: 未知的算法名称 '$ALGORITHM_NAME'。请在 exp.sh 的 case 语句中定义它。"
                     exit 1;;
@@ -144,40 +145,40 @@ cat "$CONFIG_FILE" | jq -c '.experiments[]' | while read -r dataset_config; do
                --acorn_n "$ACORN_N" --acorn_m "$ACORN_M" --acorn_m_beta "$ACORN_M_BETA" --acorn_gamma "$ACORN_GAMMA"
             
             # 新增判断：如果 build_mode 不是 '串行'，则构建任务已完成，直接跳过 GT 生成和搜索，进入下一个实验。
-            # if [[ "$BUILD_MODE" == "parallel" || "$BUILD_MODE" == "acorn_only" || "$BUILD_MODE" == "ung_only" ]]; then
-            #    echo "[INFO] Skipping GT generation and search steps."
-            #    echo "--- The current experimental configuration processing has been completed (BUILD ONLY) ---"
-            #    continue
-            # fi
+            if [[ "$BUILD_MODE" == "parallel" || "$BUILD_MODE" == "acorn_only" || "$BUILD_MODE" == "ung_only" ]]; then
+               echo "[INFO] Skipping GT generation and search steps."
+               echo "--- The current experimental configuration processing has been completed (BUILD ONLY) ---"
+               continue
+            fi
             
-            # # --- 调用 generate_gt.sh ---
-            # echo "Preparing Ground Truth (K=$K)..."
-            # ./generate_gt.sh \
-            #    --dataset "$DATASET" --data_dir "$DATA_DIR" --exp_output_dir "$SHARED_DATASET_DIR" --build_dir "$UNG_BUILD_DIR" \
-            #    --query_dir_name "$QUERY_DIR_NAME" \
-            #    --K "$K"
+            # --- 调用 generate_gt.sh ---
+            echo "Preparing Ground Truth (K=$K)..."
+            ./generate_gt.sh \
+               --dataset "$DATASET" --data_dir "$DATA_DIR" --exp_output_dir "$SHARED_DATASET_DIR" --build_dir "$UNG_BUILD_DIR" \
+               --query_dir_name "$QUERY_DIR_NAME" \
+               --K "$K"
 
-            # # --- 调用 search.sh ---
-            # INDEX_DIR_NAME="M${MAX_DEGREE}_LB${LBUILD}_alpha${ALPHA}_C${NUM_CROSS_EDGES}_EP${NUM_ENTRY_POINTS}_AN${ACORN_N}_AM${ACORN_M}_AMB${ACORN_M_BETA}_AG${ACORN_GAMMA}"
-            # echo "Begin search (K=$K)..."
-            # ./search.sh \
-            #    --dataset "$DATASET" --data_dir "$DATA_DIR" \
-            #    --query_dir_name "$QUERY_DIR_NAME" \
-            #    --shared_output_dir "$SHARED_DATASET_DIR" \
-            #    --algo_result_dir "$ALGO_RESULT_DIR" \
-            #    --build_dir "$UNG_BUILD_DIR" \
-            #    --index_dir_name "$INDEX_DIR_NAME" \
-            #    --build_mode "$BUILD_MODE" \
-            #    --num_entry_points "$NUM_ENTRY_POINTS" \
-            #    --Lsearch_start "$LSEARCH_START" --Lsearch_end "$LSEARCH_END" --Lsearch_step "$LSEARCH_STEP" \
-            #    --num_threads "$NUM_THREADS" --K "$K" --num_repeats "$NUM_REPEATS" \
-            #    --is_new_trie_method "$IS_NEW_TRIE_METHOD" --is_rec_more_start "$IS_REC_MORE_START" \
-            #    --routing_mode "$ROUTING_MODE" \
-            #    --baseline_alg "$BASELINE_ALG" \
-            #    --efs_start "$ACORN_EFS_START" \
-            #    --efs_step_slow "$ACORN_EFS_STEP_SLOW" --efs_step_fast "$ACORN_EFS_STEP_FAST" --lsearch_threshold "$LSEARCH_THRESHOLD" 
+            # --- 调用 search.sh ---
+            INDEX_DIR_NAME="M${MAX_DEGREE}_LB${LBUILD}_alpha${ALPHA}_C${NUM_CROSS_EDGES}_EP${NUM_ENTRY_POINTS}_AN${ACORN_N}_AM${ACORN_M}_AMB${ACORN_M_BETA}_AG${ACORN_GAMMA}"
+            echo "Begin search (K=$K)..."
+            ./search.sh \
+               --dataset "$DATASET" --data_dir "$DATA_DIR" \
+               --query_dir_name "$QUERY_DIR_NAME" \
+               --shared_output_dir "$SHARED_DATASET_DIR" \
+               --algo_result_dir "$ALGO_RESULT_DIR" \
+               --build_dir "$UNG_BUILD_DIR" \
+               --index_dir_name "$INDEX_DIR_NAME" \
+               --build_mode "$BUILD_MODE" \
+               --num_entry_points "$NUM_ENTRY_POINTS" \
+               --Lsearch_start "$LSEARCH_START" --Lsearch_end "$LSEARCH_END" --Lsearch_step "$LSEARCH_STEP" \
+               --num_threads "$NUM_THREADS" --K "$K" --num_repeats "$NUM_REPEATS" \
+               --is_new_trie_method "$IS_NEW_TRIE_METHOD" --is_rec_more_start "$IS_REC_MORE_START" \
+               --routing_mode "$ROUTING_MODE" \
+               --baseline_alg "$BASELINE_ALG" \
+               --efs_start "$ACORN_EFS_START" \
+               --efs_step_slow "$ACORN_EFS_STEP_SLOW" --efs_step_fast "$ACORN_EFS_STEP_FAST" --lsearch_threshold "$LSEARCH_THRESHOLD" 
                     
-            # echo "--- Finished: Dataset=[$DATASET], Query=[$QUERY_DIR_NAME], Algorithm=[$ALGORITHM_NAME] ---"
+            echo "--- Finished: Dataset=[$DATASET], Query=[$QUERY_DIR_NAME], Algorithm=[$ALGORITHM_NAME] ---"
         done
     done
 done

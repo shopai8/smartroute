@@ -10,7 +10,7 @@ import seaborn as sns
 # ==========================================
 # 配置区域 (Configuration)
 # ==========================================
-BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
+BASE_DIR = "/mnt/disk1/syh/ljk/FilterVector/FilterVectorResults"
 
 # "Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","VariousImg","Laion"
 DATASETS = ["Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","VariousImg","Laion"]
@@ -18,9 +18,9 @@ DATASETS = ["Amazon","BookReviews","Genome","Music","Reviews", "Tiktok","Various
 # 算法名称到文件夹名称的映射
 ALGO_FOLDERS = {
     'UNG-nTfalse': 'UNG-nTfalse',
-    # 'UNG-nTtrue': 'UNG-nTtrue',
+    'UNG-nTtrue': 'UNG-nTtrue',
     'ACORN-gamma': 'ACORN-gamma',
-    # 'ACORN-improved': 'ACORN-gamma-improved',
+    'ACORN-improved': 'ACORN-gamma-improved',
     'NaviX': 'NaviX-ACORN',    
     'pre-filter': 'pre-filter'
 }

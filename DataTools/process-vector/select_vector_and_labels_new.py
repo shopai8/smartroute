@@ -85,7 +85,7 @@ def write_output_files(output_dir, data_list, dataset, file_suffix, prefix=""):
 
 
 # --------------------------------------------------------------------------------
-# 核心分析函数 (与原版一致)
+# 核心分析函数
 # --------------------------------------------------------------------------------
 
 def analyze_all_queries(query_df, dataset, merged_data_dir, base_labels_path):
@@ -148,33 +148,33 @@ def analyze_all_queries(query_df, dataset, merged_data_dir, base_labels_path):
     query_df_performance = query_df.drop(columns=['QueryID'])
     merged_df = pd.merge(analysis_df, query_df_performance, on='temp_unique_id')
     
-    # 我们现在有一个包含 'vector', 'coverage', 'length' 和所有性能列的完整 DataFrame
+    #现在有一个包含 'vector', 'coverage', 'length' 和所有性能列的完整 DataFrame
     return merged_df.drop(columns=['temp_unique_id'])
 
 
 # =========================================================================
-# --- 新的主流程 (MAIN) ---
+# --- 主流程 (MAIN) ---
 # =========================================================================
 
 if __name__ == "__main__":
     # ===================== 用户配置区 =====================
 
-    DATASET = "BookReviews" 
+    DATASET = "VariousImg" 
     
     # 1. 这是 new_select.py 生成的 *输入* 文件
-    SELECTED_CSV_PATH = "/home/fengxiaoyao/FilterVector/FilterVectorResults/BookReviews/Results/per-query_results/BookReviews_weighted_sub_base_123456789_K10_Comparison_selected_queries.csv"
+    SELECTED_CSV_PATH = "/home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/Results/per-query_results/VariousImg_sub-base-123456789_K10_Comparison_selected_queries.csv"
     
     # 2. 这是包含 *所有* 原始查询向量和标签的目录
-    MERGED_DATA_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorData/BookReviews/query_B_C_D-weighted-sub-base-123456789"
+    MERGED_DATA_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorData/VariousImg/query_A_B_C-weighted-sub-base-123456789"
     
     # 3. 这是包含 *所有* 基础数据标签的 .txt 文件
-    BASE_LABELS_PATH = "/home/fengxiaoyao/FilterVector/FilterVectorData/BookReviews/BookReviews_base_labels.txt"
+    BASE_LABELS_PATH = "/home/fengxiaoyao/FilterVector/FilterVectorData/VariousImg/VariousImg_base_labels.txt"
     
     # 4. 这是你希望所有新查询子集写入的 *根* 目录
-    BASE_OUTPUT_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorData/BookReviews"
+    BASE_OUTPUT_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorData/VariousImg"
     
-    # 5. 输出查询目录的前缀 (例如 "query_select_imp")
-    OUTPUT_PREFIX = "query_select_imp"
+    # 5. 输出查询目录的前缀 (例如 "query_select_pf")
+    OUTPUT_PREFIX = "query_select_pf"
     # =========================================================================
     
     print("="*80)

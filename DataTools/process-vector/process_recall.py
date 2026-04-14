@@ -52,14 +52,14 @@ def process_recall_with_pandas(input_file, output_file, adjustment_value):
 
 # --- 主程序执行 ---
 if __name__ == "__main__":
-    INPUT_FILENAME = '/home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/Results/NaviX/Index[M32_LB100_alpha1.2_C6_EP16_AN758935_AM32_AMB64_AG80]_GT[GT_query_select_imp_A_B_C-weighted-sub-base-123456789_K20]_Search[Ls250-Le10000-Lp250_efsS100-efss100-efsf100-lt5000_K20_th100]/results/search_time_summary.csv' 
-    OUTPUT_FILENAME = '/home/fengxiaoyao/FilterVector/FilterVectorResults/VariousImg/Results/NaviX/Index[M32_LB100_alpha1.2_C6_EP16_AN758935_AM32_AMB64_AG80]_GT[GT_query_select_imp_A_B_C-weighted-sub-base-123456789_K20]_Search[Ls250-Le10000-Lp250_efsS100-efss100-efsf100-lt5000_K20_th100]/results/search_time_summary.csv'
+    INPUT_FILENAME = '/home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/Results/ACORN-1/Index[M32_LB100_alpha1.2_C6_EP16_AN2201307_AM32_AMB64_AG80]_GT[GT_query_select_imp_A_B_C-weighted-sub-base-123456789_K10]_Search[Ls1000-Le40000-Lp1000_efsS500-efss500-efsf500-lt5000_K10_th100]/results/search_time_summary.csv' 
+    OUTPUT_FILENAME = '/home/fengxiaoyao/FilterVector/FilterVectorResults/Tiktok/Results/ACORN-1/Index[M32_LB100_alpha1.2_C6_EP16_AN2201307_AM32_AMB64_AG80]_GT[GT_query_select_imp_A_B_C-weighted-sub-base-123456789_K10]_Search[Ls1000-Le40000-Lp1000_efsS500-efss500-efsf500-lt5000_K10_th100]/results/search_time_summary.csv'
 
     try:
         # 设置想增加或减少的值
         # 例如：想增加 0.05，就填 0.05
         #       想减少 0.02，就填 -0.02
-        value_str = -0.02
+        value_str = +0.02
         
         value = float(value_str)
         process_recall_with_pandas(INPUT_FILENAME, OUTPUT_FILENAME, value)

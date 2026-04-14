@@ -23,7 +23,7 @@ except ImportError:
 # 1. 全局配置区域
 # ==========================================
 DATASET_LIST = ["Amazon", "BookReviews", "Genome", "Music", "Reviews", "Tiktok", "VariousImg", "Laion"] 
-BASE_DIR = "/home/fengxiaoyao/FilterVector/FilterVectorResults"
+BASE_DIR = "/mnt/disk1/syh/ljk/FilterVector/FilterVectorResults"
 
 # 记得修改output_dir！！！！！！
 
@@ -34,7 +34,7 @@ NAIVE_STRATEGY = {
     "default": "auto"
 }
 
-SUMMARY_OUT_DIR = os.path.join(BASE_DIR, "SelectModels_summary", "naive_smart_route_2")
+SUMMARY_OUT_DIR = os.path.join(BASE_DIR, "SelectModels_summary", "naive_smart_route")
 
 # ==========================================
 # 2. 核心功能函数
@@ -266,7 +266,7 @@ def process_single_dataset(dataset_name):
     print(f"{'='*60}")
     
     csv_path = os.path.join(BASE_DIR, "EDA_Plots", dataset_name, f"{dataset_name}_aligned_results.csv")
-    output_dir = os.path.join(BASE_DIR, dataset_name, "SelectModels", "naive_smart_route_3")
+    output_dir = os.path.join(BASE_DIR, dataset_name, "SelectModels", "naive_smart_route")
     os.makedirs(output_dir, exist_ok=True)
     
     if not os.path.exists(csv_path):

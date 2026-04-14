@@ -131,7 +131,8 @@ def handle_processing_and_merge_tasks(config):
         print("  -> 正在缩短列名以便阅读 (例如: SearchTime_ms_method3 -> ST_M3)...")
         metric_map = {'SearchTime_ms': 'ST', 'Time_ms': 'T', 'Recall': 'R', 'Optimal_Lsearch': 'L'}
         algo_map = {
-            'method3': 'M3', 'method2': 'M2', 'method1': 'M1',        
+            'SmartRoute': 'SR', 'FastSmartRoute': 'FSR', 'FastSmartRoute+': 'FSR+', 
+            'pre-filter': 'PR', 'NaviX-ACORN': 'NX',      
             'ACORN-gamma': 'AG', 'ACORN-1': 'A1',    
             'ACORN-gamma-improved': 'AGI',   
             'UNG-nTfalse': 'UNG', 'UNG-nTtrue': 'UNGT'

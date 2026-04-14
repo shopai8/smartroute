@@ -32,7 +32,17 @@ else()
 endif()
 
 # build options
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=0 -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=0 -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
+option(UNG_FORCE_GLIBCXX_ABI0 "Force -D_GLIBCXX_USE_CXX11_ABI=0 for legacy prebuilt dependencies" OFF)
+if(UNG_FORCE_GLIBCXX_ABI0)
+    add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+    message(WARNING "UNG_FORCE_GLIBCXX_ABI0=ON: building with old libstdc++ ABI (0).")
+else()
+    message(STATUS "UNG_FORCE_GLIBCXX_ABI0=OFF: using default libstdc++ ABI (usually 1).")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
+
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -DNDEBUG -Ofast -march=native -mtune=native")
 

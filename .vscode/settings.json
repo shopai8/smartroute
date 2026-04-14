@@ -1,0 +1,5 @@
+{
+    "compareFolders.excludeFilter": [
+        "/exp.sh"
+    ]
+}

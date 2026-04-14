@@ -9,7 +9,8 @@ import sys
 
 METRIC_MAP_SELECT = {'SearchTime_ms': 'ST'}
 ALGO_MAP_SELECT = {
-    'method3': 'M3', 'method2': 'M2', 'method1': 'M1',
+    'SmartRoute': 'SR', 'FastSmartRoute': 'FSR', 'FastSmartRoute+': 'FSR+', 
+    'pre-filter': 'PR', 'NaviX-ACORN': 'NX',
     'ACORN-gamma': 'AG', 'ACORN-1': 'A1',
     'ACORN-gamma-improved': 'AGI',
     'UNG-nTfalse': 'UNG', 'UNG-nTtrue': 'UNGT'
@@ -20,13 +21,6 @@ ALGO_MAP_SELECT = {
 # ==============================================================================
 
 def run_selection(merged_summary_path, output_path, params, attribute_coverage_path):
-    """
-    执行新的筛选逻辑：
-    (已更新) ...
-    (已更新) 3. 按 QueryID 将合格查询分为 A, B, C 三类。
-    (已更新) 4. (新增) 可选地，根据 'c_length_range' 过滤 C 类查询。
-    (已更新) 5. 按 config.json 中定义的比例从 A, B, C 中随机抽样。
-    """
     
     print("\n[Selection] 开始执行新的'比例抽样'筛选策略...")
     
@@ -121,7 +115,6 @@ def run_selection(merged_summary_path, output_path, params, attribute_coverage_p
         print("\n  -> [Global Filter] 全局过滤未启用 (enabled=False)。")
 
     # ==========================================================================
-    # ==========================================================================
 
     
     # --- 步骤 A: (可选) 加速比筛选 ---
@@ -132,6 +125,9 @@ def run_selection(merged_summary_path, output_path, params, attribute_coverage_p
         print("\n  -> 'enable_speedup_filter' 为 True。执行步骤 A：加速比筛选...")
         target_alg = params.get('speedup_target_algorithm')
         baseline_algs = params.get('speedup_baseline_algorithms', [])
+        
+        # 从 params 中获取阈值，默认为 1.0
+        speedup_threshold = params.get('speedup_threshold', 1.0)
 
         if not target_alg or not baseline_algs:
             print("  -> 错误: config.json 中未定义 'speedup_target_algorithm' 或 'speedup_baseline_algorithms'。")
@@ -165,8 +161,10 @@ def run_selection(merged_summary_path, output_path, params, attribute_coverage_p
             df_ratios.replace([np.inf, -np.inf], np.nan, inplace=True)
             df_ratios.dropna(subset=['min_speedup'], inplace=True)
             
-            df_qualified = df_ratios[df_ratios['min_speedup'] > 1.0].copy()
-            print(f"     -> 共有 {len(df_qualified)} / {len(df_ratios)} 个查询满足 '最小加速比 > 1.0'。")
+            # 将原来的 > 1.0 替换为 >= speedup_threshold
+            print(f"     -> 正在应用加速比阈值: min_speedup >= {speedup_threshold}")
+            df_qualified = df_ratios[df_ratios['min_speedup'] >= speedup_threshold].copy()
+            print(f"     -> 共有 {len(df_qualified)} / {len(df_ratios)} 个查询满足条件。")
 
             if df_qualified.empty:
                 print("     -> 警告: 没有查询满足条件，无法继续筛选。")
@@ -186,11 +184,32 @@ def run_selection(merged_summary_path, output_path, params, attribute_coverage_p
 
     # --- 步骤 B: 按 QueryID 分类 ---
     print("\n  -> 步骤 B: 按 QueryID 范围将合格查询分为 A, B, C 三类...")
-    
 
-    df_A = df_qualified[df_qualified['QueryID'] < 100].copy()
-    df_B = df_qualified[(df_qualified['QueryID'] >= 101) & (df_qualified['QueryID'] < 200)].copy()
-    df_C = df_qualified[df_qualified['QueryID'] >= 202].copy()
+    # 从 params 中获取数据集名称和配置
+    dataset_name = params.get("current_dataset_name")
+    splits_config = params.get("query_id_splits", {})
+
+    # 定义默认分界点（对应原硬编码逻辑）
+    # 格式: [A_max, B_min, B_max, C_min]
+    default_splits = [100, 101, 200, 202]
+
+    # 获取当前数据集的特定分界点，如果没有则使用默认值
+    splits = splits_config.get(dataset_name, default_splits)
+
+    if len(splits) < 4:
+        print(f"  -> 警告: '{dataset_name}' 的 query_id_splits 格式不正确，使用默认值。")
+        splits = default_splits
+
+    bound_a_max = splits[0]
+    bound_b_min = splits[1]
+    bound_b_max = splits[2]
+    bound_c_min = splits[3]
+
+    print(f"     -> 当前数据集 '{dataset_name}' 使用分界点: A < {bound_a_max}, {bound_b_min} <= B < {bound_b_max}, C >= {bound_c_min}")
+
+    df_A = df_qualified[df_qualified['QueryID'] < bound_a_max].copy()
+    df_B = df_qualified[(df_qualified['QueryID'] >= bound_b_min) & (df_qualified['QueryID'] < bound_b_max)].copy()
+    df_C = df_qualified[df_qualified['QueryID'] >= bound_c_min].copy()
     
     # ========================================================
     # --- 检查并应用 A 类 Recall 过滤器 ---

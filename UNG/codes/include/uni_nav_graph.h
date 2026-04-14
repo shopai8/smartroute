@@ -31,6 +31,7 @@ namespace ANNS
       double descendants_merge_time_ms;  // descendants合并耗时
       double coverage_merge_time_ms;     // coverage合并耗时
       double get_min_super_sets_time_ms; // 获取最小入口集合耗时
+      double fpass_time_ms = 0.0;
 
       size_t num_distance_calcs;
       int acorn_efs_used;
@@ -65,7 +66,7 @@ namespace ANNS
       size_t exact_cand_size = 0;
       float global_p_pass = 0.0f;
 
-    float algo_choice;                   // 记录最终选择的 0-7 算法代号
+    int algo_choice;                   // 记录最终选择的 0-7 算法代号
     bool is_intel_els_used;             // 仅当真正调用 _trie_method_selector 推理时为 true
     bool is_trie_recursive;               // 记录实际计算 ELS 时，用的是 递归(nTtrue) 还是 非递归(nTfalse)
 
@@ -149,7 +150,8 @@ namespace ANNS
                          int lsearch_start, int lsearch_step,
                          int efs_start, int efs_step_slow,int efs_step_fast,int lsearch_threshold, 
                          int routing_mode, int baseline_alg, faiss_navix::IndexHNSWFlat* navix_index = nullptr,
-                         const std::vector<IdxType> &true_query_group_ids = {}); // 包含每个查询其真实来源组ID的向量
+                         const std::vector<IdxType> &true_query_group_ids = {}, // 包含每个查询其真实来源组ID的向量
+                         const std::string &algo_choice_csv_path = "");
 
       // I/O
       void save(std::string index_path_prefix, std::string results_path_prefix);
@@ -252,10 +254,21 @@ namespace ANNS
       const std::bitset<16000000>& final_bitmap,
       IdxType K,
       std::pair<IdxType, float>* results,
-      size_t& num_distance_calcs);
+      size_t& num_distance_calcs,
+      bool use_optimized_bitset);
     const std::bitset<16000000>& get_exact_cand_size_and_mask(
       const std::vector<LabelType>& query_labels,
       size_t& cand_size) const;
+
+    // 使用CRoaring进行bitmap计算
+    std::vector<roaring::Roaring> _vec_attr_roaring_inv;// 底层向量级别的 CRoaring 倒排索引 (用于极速计算 GlobalPpass)
+    void build_vector_inverted_indices();
+    void search_baseline_exact_roaring(
+        const char* query,
+        const roaring::Roaring& valid_bitmap,
+        IdxType K,
+        std::pair<IdxType, float>* results,
+        size_t& num_distance_calcs);
 
 
       // 求search中flag需要的数据结构
@@ -279,6 +292,15 @@ namespace ANNS
 
       void warmup_selectors(uint32_t num_threads);//预热selector模型，避免首次查询时的延迟
 
+
+
+    // 为 Method 2 准备的极轻量级倒排邻接表：[AttrID] -> [GroupID1, GroupID2, ...]
+    std::vector<std::vector<IdxType>> _group_attr_adj_list; 
+    // 为 Method 3 准备的 CRoaring 倒排索引：[AttrID] -> RoaringBitmap(GroupIDs)
+    std::vector<roaring::Roaring> _group_attr_roaring_inv;
+    void build_group_inverted_indices();// 构建倒排索引
+    void evaluate_fpass_methods(std::shared_ptr<IStorage> query_storage, const std::string& output_csv_path);// 执行 5 种 Fpass 计算方法的 Benchmark
+
    private:
 
       void thread_function(std::queue<int>& Qid_595,std::shared_ptr<IStorage> &query_storage,
@@ -294,7 +316,8 @@ namespace ANNS
                                    int efs_start, int efs_step_slow,int efs_step_fast,int lsearch_threshold,
                                    int routing_mode,int baseline_alg, IdxType num_queries, 
                                    faiss_navix::IndexHNSWFlat* navix_index,
-                                   const std::vector<IdxType> &true_query_group_ids);
+                                   const std::vector<IdxType> &true_query_group_ids,
+                                   const std::vector<int> &query_algo_choices);
       size_t get_candidate_count_for_label(LabelType label) const;
       // data
       std::shared_ptr<IStorage> _base_storage,
@@ -423,9 +446,11 @@ namespace ANNS
 
       // smartroute selector
       std::unique_ptr<MethodSelector> _smart_route_selector;    // 单层 SmartRoute (5特征)
+      std::unique_ptr<MethodSelector> _fast_route_single_selector;
       std::unique_ptr<MethodSelector> _fast_route_l1_selector;  // FastSmartRoute L1 (3特征)
-      std::unique_ptr<MethodSelector> _fast_route_l2_selector;
-      int _l1_majority_acorn_id = 2; // 默认兜底为 2 (ACORN-gamma)，以防文件读取失败
+      std::unique_ptr<MethodSelector> _fast_route_l2_selector;  // FastSmartRoute L2 (5特征)
+      int _single_majority_acorn_id = 2; // 单层模型的 ACORN 多数派兜底
+      int _l1_majority_acorn_id = 2; // L1 模型的 ACORN 多数派兜底
       int _naive_majority_acorn_id = 2; // 用于存储 Naive SmartRoute的 ACORN 家族多数派 ID
       int determine_routing_strategy(
         int routing_mode, 
@@ -435,6 +460,9 @@ namespace ANNS
         std::vector<IdxType>& entry_group_ids,
         bool is_new_trie_method,
         bool is_rec_more_start);
+      std::vector<int> load_query_algo_choices_from_csv(
+        const std::string &csv_path,
+        size_t expected_num_queries) const;
    };
 }
 
