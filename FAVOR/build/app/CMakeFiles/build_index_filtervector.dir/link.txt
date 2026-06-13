@@ -1,1 +1,0 @@
-/usr/bin/c++  -fopenmp -O3 -march=native -mtune=native -mavx2 -mfma -ffast-math -funroll-loops -ftree-vectorize -fvect-cost-model=dynamic -O3 -DNDEBUG CMakeFiles/build_index_filtervector.dir/build_index_filtervector.cpp.o -o build_index_filtervector  ../src/libUTIL.a -fopenmp /usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a

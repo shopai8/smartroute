@@ -5,3 +5,5 @@
 /knowhere/build/
 /knowhere/**/build/
 Dockerfile
+FAVOR/build/
+FAVOR/tmp/

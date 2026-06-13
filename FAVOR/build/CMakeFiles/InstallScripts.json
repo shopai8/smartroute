@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/lijiakang/FilterVector/FilterVectorCode/FAVOR/build/cmake_install.cmake",
-		"/home/lijiakang/FilterVector/FilterVectorCode/FAVOR/build/app/cmake_install.cmake",
-		"/home/lijiakang/FilterVector/FilterVectorCode/FAVOR/build/src/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

@@ -1,1 +1,0 @@
-/usr/bin/c++  -fopenmp -O3 -march=native -mtune=native -mavx2 -mfma -ffast-math -funroll-loops -ftree-vectorize -fvect-cost-model=dynamic -O3 -DNDEBUG CMakeFiles/generate_query_conditions.dir/generate_query_conditions.cpp.o -o generate_query_conditions  ../src/libUTIL.a -fopenmp /usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a

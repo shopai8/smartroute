@@ -1,2 +1,0 @@
-/usr/bin/ar qc libUTIL.a CMakeFiles/UTIL.dir/baseset.cpp.o CMakeFiles/UTIL.dir/dataset.cpp.o CMakeFiles/UTIL.dir/filter_condition.cpp.o CMakeFiles/UTIL.dir/queryset.cpp.o
-/usr/bin/ranlib libUTIL.a
