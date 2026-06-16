@@ -51,6 +51,7 @@ FilterVectorCode/
 ├── NaviX/                  # Implementation related to NaviX
 ├── UNG/                    # UNG / UNG+ implementation and data-processing scripts
 ├── knowhere/               # Dependency for the Milvus baseline
+├── FAVOR/                  # Dependency for the FAVOR baseline
 ├── data/                   # Dataset directory
 ├── experiment_json/        # Example experiment configurations
 ├── build_hybrid.sh         # Unified build script
